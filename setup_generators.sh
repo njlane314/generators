@@ -4,13 +4,10 @@ export TERM=screen
 BASE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]:-${(%):-%x}}" )" && pwd )"
 source ${BASE_DIR}/global_vars.sh
 
-# This needs to be added back when we move to neut 6 w/o a container
 ## NEUT
-#export NEUTROOT=/exp/uboone/app/users/apapadop/BuildEventGenerators/neut
-#source ${NEUTROOT}/neutbuild/cernlib/setup_cernlib.sh
-#export LD_LIBRARY_PATH=${NEUTROOT}/src/reweight:${LD_LIBRARY_PATH}
-#source ${NEUTROOT}/build/Linux/setup.sh
-##echo "NEUT setup is ready!"
+export NEUTROOT=${BASE_DIR}/neut
+source ${NEUTROOT}/build/Linux/bin/setup.NEUT.sh 
+#echo "NEUT setup is ready!"
 
 # GENIE
 export GENIE_FQ_DIR=${BASE_DIR}
