@@ -17,23 +17,20 @@ touch ${DUMMY_OUTPUT_FILE}
 # Get the source code for GENIE v3
 cd $CONDOR_DIR_INPUT
 source /cvmfs/larsoft.opensciencegrid.org/products/setups
-setup git v2_15_1
-#git clone https://github.com/GENIE-MC/Generator.git genie-build
-git clone https://github.com/sjgardiner/Generator.git genie-build
+git clone https://github.com/GENIE-MC/Generator.git genie-build
 
 # Set up GENIE environment
 setup root v6_12_04e -q e15:prof
 setup lhapdf v5_9_1k -q e15:prof
 setup pdfsets v5_9_1b
 setup log4cpp v1_1_3a -q e15:prof
+setup git v2_15_1
 
 echo "Setting GENIE environment variables..."
 
 export GENIEBASE=$(pwd)
 export GENIE=$GENIEBASE/genie-build
 export PYTHIA6=$PYTHIA_FQ_DIR/lib
-# This is handled by the pdfsets ups product
-#export LHAPATH=$LHAPDF_FQ_DIR
 export LHAPDF5_INC=$LHAPDF_INC
 export LHAPDF5_LIB=$LHAPDF_LIB
 export LD_LIBRARY_PATH=$GENIE/lib:$LD_LIBRARY_PATH

@@ -47,3 +47,6 @@ source ${BASE_DIR}/nusystematics/build/Linux/bin/setup.nusystematics.sh
 # NUISANCE
 source ${BASE_DIR}/nuisance/build/Linux/setup.sh
 #echo "NUISANCE setup is ready!"
+
+htgettoken -a htvaultprod.fnal.gov -i sbnd
+#htgettoken -a htvaultprod.fnal.gov -i uboone

@@ -2,6 +2,8 @@
 
 number_of_events = 1000000 # the number of probe interactions to simulate
 
+# cross_section_table_path = "../data" # this can be used to override $NEUT_CRSPATH
+
 # verbosity = "loud"
 # verbosity = "quiet"
 verbosity = "very_quiet"
@@ -51,7 +53,8 @@ direction_type = "z" # probe approaches target along [0.0, 0.0, 1.0]
 # energy_range_mev = [100.0, 1000.0]
 #
 energy_spectrum_type = "root"
-energy_histogram = [ "MCC9_FluxHist_volTPCActive.root", "hEnumu_cv", "gev"]
+#energy_histogram = [ "MCC9_FluxHist_volTPCActive.root", "hEnumu_cv", "gev"]
+energy_histogram = [ "sbnd_flux.root", "flux_sbnd_numu", "gev"]
 
 [neut.target]
 
@@ -65,9 +68,50 @@ num_free_protons = 0
 
 [neut.target.hadron_rescattering]
 
+nucleon_effective_mass = "on"
+FSI_pauli_blocking_scaling = 1
+
+# pion_model_low_energy = "salcedo"
+pion_model_low_energy = "tuned"
+
+# pion_model_high_energy = "salcedo"
+pion_model_high_energy = "proton_neutron_separated"
+
+# pion_kinematic_model = "isotropic_decay"
+pion_kinematic_model = "SAID"
+
+pion_coulomb_correction = "off"
+
+pion_rescattering = "on"
+pion_rescattering_nuclear_model = "data_driven"
+# pion_rescattering_nuclear_model = "lfg"
+
 nucleon_rescattering = "on"
 nucleon_rescattering_nuclear_model = "lfg"
 # nucleon_rescattering_nuclear_model = "gfg"
+
+[neut.target.hadron_rescattering.pion_cross_sections]
+
+qe = 1.069
+qe_high = 1.824
+inelastic = 1.002
+absorption = 1.404
+coherent = 1.0
+charge_exchange = 0.697
+charge_exchange_high = 1.800
+
+qe_fraction = 1.0
+coh_fraction = 0.0
+charge_exchange_fraction = 0.0
+
+mean_free_path = 1.0
+
+[neut.target.hadron_rescattering.nucleon_cross_sections]
+
+mean_free_path = 1
+elastic = 1
+single_pi_prod = 1
+double_pi_prod = 1
 
 [neut.target.nuclear_effects]
 
@@ -77,6 +121,8 @@ pauli_blocking = "on"
 # N.B. this isn't really equivalent to turning off PB as the input HTs already have PB included
 pauli_blocking_2p2h = "on"
 pauli_blocking_fsi = "on"
+# pauli_blocking_fsi = "off"
+# pauli_blocking_fsi = "hybrid" # Reduces PB probability for nucleons with KE < 150
 
 nucleon_absorption_and_pion_ejection = "on"
 deexcitation = "o16_deexcitation"
@@ -89,9 +135,76 @@ formation_length = "on_except_qe"
 formation_zone_scat_parameter = 0.08
 
 [neut.interaction_model]
-#mode_choice_type = "normal" # choose according to nominal cross-section prediction
-mode_choice_type = "rescaled" # read mode rescaling's from neut.interaction_model.mode_rescaling table
+
+flag_pi0_decay = "off"
+#flag_pi0_decay = "on" # describe pi0 decay into two gamma in the final state
+
+mode_choice_type = "normal" # choose according to nominal cross-section prediction
+# mode_choice_type = "rescaled" # read mode rescaling's from neut.interaction_model.mode_rescaling table
 # mode_choice_type = "single" # set a single NEUT mode to simulate with "mode"
+
+# mode = "CC_QE_nu"
+# mode = "CC_2p2h_nu"
+# mode = "CC_RES_ppi+_nu"
+# mode = "CC_RES_ppi0_nu"
+# mode = "CC_RES_npi+_nu"
+# mode = "CC_COH_nu"
+# mode = "CC_DIF_nu"
+# mode = "CC_eta_nu"
+# mode = "CC_kaon_nu"
+# mode = "CC_1gamma_nu"
+# mode = "CC_multi_pi_nu"
+# mode = "CC_DIS_nu"
+
+# mode = "NC_elastic_free_p_nu"
+# mode = "NC_elastic_bound_p_nu"
+# mode = "NC_elastic_n_nu"
+# mode = "NC_RES_npi0_nu"
+# mode = "NC_RES_ppi0_nu"
+# mode = "NC_RES_ppi-_nu"
+# mode = "NC_RES_npi+_nu"
+# mode = "NC_COH_nu"
+# mode = "NC_DIF_nu"
+# mode = "NC_eta_n_nu"
+# mode = "NC_eta_p_nu"
+# mode = "NC_kaon_n_nu"
+# mode = "NC_kaon_p_nu"
+# mode = "NC_multi_pi_nu"
+# mode = "NC_1gamma_n_nu"
+# mode = "NC_1gamma_p_nu"
+# mode = "NC_DIS_nu"
+
+# mode = "CC_QE_free_proton_nubar"
+# mode = "CC_QE_bound_proton_nubar"
+# mode = "CC_2p2h_nubar"
+# mode = "CC_RES_npi-_nubar"
+# mode = "CC_RES_ppi0_nubar"
+# mode = "CC_RES_ppi-_nubar"
+# mode = "CC_COH_nubar"
+# mode = "CC_DIF_nubar"
+# mode = "CC_eta_nubar"
+# mode = "CC_kaon_nubar"
+# mode = "CC_1gamma_nubar"
+# mode = "CC_multi_pi_nubar"
+# mode = "CC_DIS_nubar"
+
+# mode = "NC_elastic_free_p_nubar"
+# mode = "NC_elastic_bound_p_nubar"
+# mode = "NC_elastic_n_nubar"
+# mode = "NC_RES_npi0_nubar"
+# mode = "NC_RES_ppi0_nubar"
+# mode = "NC_RES_ppi-_nubar"
+# mode = "NC_RES_npi+_nubar"
+# mode = "NC_COH_nubar"
+# mode = "NC_DIF_nubar"
+# mode = "NC_eta_n_nubar"
+# mode = "NC_eta_p_nubar"
+# mode = "NC_kaon_n_nubar"
+# mode = "NC_kaon_p_nubar"
+# mode = "NC_1gamma_n_nubar"
+# mode = "NC_1gamma_p_nubar"
+# mode = "NC_multi_pi_nubar"
+# mode = "NC_DIS_nubar"
 
 [neut.interaction_model.mode_rescaling]
 
@@ -141,36 +254,57 @@ mode_choice_type = "rescaled" # read mode rescaling's from neut.interaction_mode
 "CC_multi_pi_nubar" = 1.0
 "CC_DIS_nubar" = 1.0
 
-"NC_elastic_free_p_nubar" = 1.0
-"NC_elastic_bound_p_nubar" = 1.0
-"NC_elastic_n_nubar" = 1.0
-"NC_RES_npi0_nubar" = 1.0
-"NC_RES_ppi0_nubar" = 1.0
-"NC_RES_ppi-_nubar" = 1.0
-"NC_RES_npi+_nubar" = 1.0
-"NC_COH_nubar" = 1.0
-"NC_DIF_nubar" = 1.0
-"NC_eta_n_nubar" = 1.0
-"NC_eta_p_nubar" = 1.0
-"NC_kaon_n_nubar" = 1.0
-"NC_kaon_p_nubar" = 1.0
-"NC_1gamma_n_nubar" = 1.0
-"NC_1gamma_p_nubar" = 1.0
-"NC_multi_pi_nubar" = 1.0
-"NC_DIS_nubar" = 1.0
+"NC_elastic_free_p_nubar" = 0.0
+"NC_elastic_bound_p_nubar" = 0.0
+"NC_elastic_n_nubar" = 0.0
+"NC_RES_npi0_nubar" = 0.0
+"NC_RES_ppi0_nubar" = 0.0
+"NC_RES_ppi-_nubar" = 0.0
+"NC_RES_npi+_nubar" = 0.0
+"NC_COH_nubar" = 0.0
+"NC_DIF_nubar" = 0.0
+"NC_eta_n_nubar" = 0.0
+"NC_eta_p_nubar" = 0.0
+"NC_kaon_n_nubar" = 0.0
+"NC_kaon_p_nubar" = 0.0
+"NC_1gamma_n_nubar" = 0.0
+"NC_1gamma_p_nubar" = 0.0
+"NC_multi_pi_nubar" = 0.0
+"NC_DIS_nubar" = 0.0
 
+[neut.interaction_model.radiative_corrections]
+
+model = "off"
+# model = "simple_toy_model"
+gamma_attach_fraction = 0.1
+egamma_low_threshold = 10
+gamma_angular_distribution = "exp_decay"
+# gamma_angular_distribution = "isotropic"
+
+[neut.interaction_model.electron]
+
+q2_threshold_MeV = 10000
+coulomb = { enabled = "on", use_ema = "off" }
+q3_dependent_eb = { enabled = "off", gradient = 0, intercept = 0 }
 
 [neut.interaction_model.QE]
 
-#model = "nieves" # use SF model by ueno-mori for NC (unrecommend)
+model = "nieves" # use SF model by ueno-mori for NC (unrecommend)
 #model = "nieves_furmanski_abe" # use SF model by furmanski-abe for NC
-model = "rome" # Benhar SF
-# model = "llewelyn-smith"
+#model = "rome" # Benhar SF
+#model = "llewelyn-smith"
 #model = "rmf"
 
-#erpa = "off" # incompatible with model = "nieves", use nieves.rpa = "on" instead
+erpa = "off" # incompatible with model = "nieves", use nieves.rpa = "on" instead
 
+kappa = 1.0
 
+second_class_currents_vector_scale = 0.0
+second_class_currents_axial_scale = 0.0
+pseudo_scalar_scale = 1
+
+pionless_delta_decay = "off"
+pionless_delta_decay_fraction = 0.0
 
 [neut.interaction_model.QE.rmf]
 # Nuclear potential for the RDIWA model. By default ED-RMF is used.
@@ -204,6 +338,7 @@ src_Emiss_cut = 80
 
 # This is the scattered lepton angle in electron scattering
 theta_l = 36
+
 [neut.interaction_model.QE.rome]
 
 # Set from nuclear target if not overriden here
@@ -235,10 +370,8 @@ strange_axial_coupling = 0.0
 sf_C12_table = "tot" # Previous SF. Nucl. Phys. A579, 493 (1994), Phys. Rev. D 72, 053005 (2005)
 #sf_C12_table = "2024" # New SF. Phys. Rev. C 110, 054612 (2024)
 
-# SF neutron energy correction
-# This parameter takes effect only for carbon currently.
-sf_neutron_energy_corr = "off"
-#sf_neutron_energy_corr = "on"
+sf_neutron_energy_corr = "on"
+#sf_neutron_energy_corr = "off"
 
 [neut.interaction_model.QE.nieves]
 
@@ -282,11 +415,13 @@ form = "dipole"
 # form = "two_component"
 # form = "three_component"
 # form = "z_expansion"
+# form = z_expansion_newgen
+# form = z_expansion_oldway
 
 # Axial mass for dipole form factor
 [neut.interaction_model.QE.axial_form_factors.dipole]
-axial_mass = 1.21
-nc_axial_mass = 1.21
+axial_mass = 1.05
+#nc_axial_mass = 1.05
 
 [neut.interaction_model.QE.axial_form_factors.n_component]
 
@@ -296,6 +431,74 @@ alpha = 0.23
 beta = 1.22
 gamma = 0.44
 theta = -0.26
+
+# Z-expansion TN 315 p 21 <3GeV as recommended
+# Use official z-expansion parameters, not Patrick's results
+[neut.interaction_model.QE.axial_form_factors.z_expansion]
+pnt = 4
+#apply 4-sum rule
+q4 = 1
+t0 = -0.280
+tc = 0.1764
+
+a0 = 0.5
+a1 = 2.28
+a2 = 0.26
+a3 = -5.20
+a4 =  2.60
+a5 =  0.5
+a6 =  0.5
+a7 =  0.5
+a8 =  0.5
+a9 =  0.5
+
+ga = 1.2723
+
+transferttype = 0
+
+# Based on https://doi.org/10.1103/PhysRevD.93.113015
+covarmatrix = [
+    [0.0169, 0.0455, -0.22035, 0.214461],
+    [0.0455, 1.0, -2.245, 0.9909],
+    [-0.22035, -2.245, 6.25, -4.62375],
+    [0.214461, 0.9909, -4.62375, 7.29]
+]
+
+transfertmatrix = [
+    [-0.99829974, 0.03752191, 0.04216688, -0.01454961],
+    [-0.03440096, 0.12232774, -0.97877435, -0.16078953],
+    [-0.04658045, -0.81323205, -0.19003449, 0.54806093],
+    [0.00666831, 0.56769857, -0.06410632, 0.82070960]
+]
+
+# -OPT=000, manual configuration
+# -OPT=100, Meyer published natif
+# -OPT=101, Meyer published PCA
+# -OPT=102, Meyer published ZCA
+# -OPT=103, Meyer published L1
+# -OPT=104, Meyer published L1Norm
+# -OPT=110, Meyer updated natif
+# -OPT=111, Meyer updated PCA
+# -OPT=112, Meyer updated ZCA
+# -OPT=113, Meyer updated L1
+# -OPT=114, Meyer updated L1Norm
+# -OPT=200, LQCD natif
+# -OPT=201, LQCD PCA
+# -OPT=202, LQCD ZCA
+# -OPT=203, LQCD L1
+# -OPT=204, LQCD L1Norm
+preset = "000"
+
+v0 = 0.0
+v1 = 0.0
+v2 = 0.0
+v3 = 0.0
+v4 = 0.0
+v5 = 0.0
+v6 = 0.0
+v7 = 0.0
+v8 = 0.0
+v9 = 0.0
 
 # Type of 2p2h model implemented
 [neut.interaction_model.2p2h]
@@ -340,5 +543,83 @@ ca5 = 1.01
 # Scaling of non-resonant background in Rein-Sehgal model
 nonresonant_background_scale = 1.3
 
+# Method for producing the pi+nucleon system from the decay of the resonant state
+# See Rein-Sehgal section 2.3 and the excellent appendix
+# Isotropic emits isotropically in resonance rest frame
+# Delta uses the Delta resonance only
+# "all_resonances" uses the three lowest resonances (See Rein-Sehgal 1981 section 2.3)
+# "delta_plus_isotropic" does an accept-reject on the size of the xsec vs the size of the xsec of the Delta resonance only: if the cross section was Delta dominated, use the Delta, if it was not use an isotropic distribution
+[neut.interaction_model.ResPP.rein_sehgal.ejection]
+
+# model options:
+# model="isotropic"
+# model="delta_only"
+# model="all_resonances"
+model = "delta_plus_isotropic"
+
+# Multipliers for the matrix elements in the FKR model, used ONLY to calculate the resonance -> pi+nucleon state. These are *NOT* used for the cross section calculation, only for the decay process
+rop3p3_mult = 1
+rom3m3_mult = 1
+rop1p1_mult = 1
+rom1m1_mult = 1
+rop3p1_mult = 1
+rom1m3_mult = 1
+rop3m1_mult = 1
+rop1m3_mult = 1
+
+[neut.interaction_model.ResPP.kabirnezhad]
+
+axial_mass = 1.06
+bkg_axial_mass = 1.03
+vector_mass = 0.84
+ca5 = 1.02
+
+# Coherent model
+[neut.interaction_model.COH]
+
+# model = "rein_sehgal"
+# model = "kartavtsev"
+model = "berger_sehgal"
+
+axial_mass = 1
+radius = 1.0
+fa1 = 0.0
+fa2 = 0.0
+
+[neut.interaction_model.DIF]
+
+model = "rein_w_cut"
+# model = "rein"
+
+axial_mass = 1.1
+nuclear_volume = 7.0
+
+[neut.interaction_model.MPiDIS]
+
+# pdf_set = "grv94_di"
+pdf_set = "grv98_lo"
+
+multiplicity_model = "neut"
+# multiplicity_model = "fit_to_bc"
+# multiplicity_model = "AGKY"
+
+[neut.interaction_model.MPiDIS.BodekYang]
+
+# correction_version = "BY19"
+correction_version = "BY05"
+# correction_version = "off"
+
+low_W_K_factor = "off"
+force_ax_vec_equal = "off"
+
+seaqbar_factor = 1
+rlong_variation = 0
+
 [neut.interaction_model.CASCADE]
 model =  "default" # options are "none",""default", "incl_placeholder"
+
+[neut.interaction_model.tauola]
+decay_mode = "all"
+polarity_mode = "taupol" # calculated by taupol.f
+#polarity_mode = "fixed" # require to set "polarity"
+#polarity = [0.0, 0.0, 1.0]
