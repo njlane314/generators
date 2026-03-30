@@ -15,7 +15,6 @@ nuisflat -i NuWro:NuWro.prep.root -o samples/NuWro.flat.root
 rm NuWroCard_CC_Ar_numu.prep.root
 rm NuWro.*
 rm NuWroCard_CC_Ar_numu.prep.root.*
-rm Ar*.txt
 rm q*.txt
 rm T.txt
 rm random_seed

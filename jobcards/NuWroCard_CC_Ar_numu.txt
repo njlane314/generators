@@ -10,7 +10,7 @@ number_of_test_events = 1000000
 
 # The number of equally weighted events to be saved:
 
-number_of_events      = 1000000
+number_of_events      = 100
 
 # Control the random seed persistence:
 random_seed  = 0     // 0 - use time(NULL) as a seed for random number generator

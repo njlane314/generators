@@ -1,10 +1,9 @@
 #!/bin/bash
 
 export events="100"
-export version="v3_6_0"
+export version="v3_6_2"
 
 export tune="AR23_20i_00_000"
-#export tune="G18_10a_02_11a"
 
 export probe="14"
 export target="1000180400"
@@ -34,7 +33,3 @@ PrepareGENIE -i ${outdir}/${probe}_${target}_${interaction}_${version}_${tune}.g
 
 # Convert to nuisance flat tree format
 nuisflat -i GENIE:${outdir}/${probe}_${target}_${interaction}_${version}_${tune}.gprep.root -o ${outdir}/${probe}_${target}_${interaction}_${version}_${tune}.flat.root
-
-# Remove all unnecessary files
-##rm *.status 
-rm input-flux.root

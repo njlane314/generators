@@ -29,4 +29,3 @@ rm main.run
 rm PYR.RG
 rm EventOutput.Pert.0000*.root
 rm *.prep.root
-mv GiBUU.prep.root samples/

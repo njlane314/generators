@@ -1,6 +1,6 @@
 [neut]
 
-number_of_events = 1000000 # the number of probe interactions to simulate
+number_of_events = 100 # the number of probe interactions to simulate
 
 # cross_section_table_path = "../data" # this can be used to override $NEUT_CRSPATH
 

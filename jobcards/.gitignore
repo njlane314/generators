@@ -5,3 +5,6 @@ gntp.0.ghep.root
 gntp.0.gst.root
 input-flux.root
 *.flat.root
+*.d
+*.so
+*.pcm
