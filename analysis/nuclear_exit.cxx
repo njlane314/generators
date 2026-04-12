@@ -194,7 +194,7 @@ std::vector<TString> flux_hist_paths(const TString& beam_polarity, TString beam_
             add("rhc", beam_species);
         }
     } else if (beam_polarity == "fhc" || beam_polarity == "rhc") {
-        add(beam_polarity, beam_species == "" ? (beam_polarity == "rhc" ? "numubar" : "numu") : beam_species);
+        add(beam_polarity, beam_species == "" ? TString(beam_polarity == "rhc" ? "numubar" : "numu") : beam_species);
     }
     return paths;
 }
@@ -225,7 +225,7 @@ TString infer_knob(TString sample)
         if (knob != "") knob += "+";
         knob += name;
     }
-    return knob == "" ? "nominal" : knob;
+    return knob == "" ? TString("nominal") : knob;
 }
 
 void label(TAxis* axis, const std::vector<TString>& names)
@@ -802,7 +802,7 @@ void nuclear_exit(
     note += "; beam_polarity=";
     note += beam_polarity;
     note += "; beam_species=";
-    note += beam_species == "" ? "default" : beam_species;
+    note += beam_species == "" ? TString("default") : beam_species;
     note += "; numi_flux_source=";
     note += flux.source;
     note += "; numi_flux_emin_GeV=";
@@ -816,7 +816,7 @@ void nuclear_exit(
     note += "; numi_flux_reweight_mean_bin_flux=";
     note += TString::Format("%.8g", flux.mean_bin_flux);
     note += "; final_state_pdg_not_used_as_exit_proxy=true";
-    TNamed("nuclear_exit_metadata", note).Write();
+    TNamed(TString("nuclear_exit_metadata"), note).Write();
     h_cutflow.Write();
     h_primary_species.Write();
     h_exit_species.Write();

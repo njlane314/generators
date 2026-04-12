@@ -580,7 +580,7 @@ std::vector<TString> flux_hist_paths(TString beam_mode, TString beam_species)
             add("rhc", beam_species);
         }
     } else if (beam_mode == "fhc" || beam_mode == "rhc") {
-        add(beam_mode, beam_species == "" ? (beam_mode == "rhc" ? "numubar" : "numu") : beam_species);
+        add(beam_mode, beam_species == "" ? TString(beam_mode == "rhc" ? "numubar" : "numu") : beam_species);
     }
     return paths;
 }
