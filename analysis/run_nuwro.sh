@@ -19,6 +19,7 @@ proposal_min_gev="${proposal_min_gev:-0}"
 proposal_max_gev="${proposal_max_gev:-10}"
 proposal_bin_width_gev="${proposal_bin_width_gev:-0.005}"
 skim_final_state="${skim_final_state:-1}"
+sanitize_card="${sanitize_card:-1}"
 
 base_card="${base_card:-${repo_root}/analysis/cards/NuWroCard_CC_Ar_numu.txt}"
 reweight_fluxfile="${reweight_fluxfile:-$(ana_flux_dat "${repo_root}" "${beam_mode}" "${beam_species}")}"
@@ -34,7 +35,17 @@ mkdir -p "${outdir}" "${workdir}"
 
 beam_energy="$(ana_nuwro_beam_energy "${proposal_min_gev}" "${proposal_max_gev}" "${proposal_bin_width_gev}")"
 reweight_flux_integral="$(ana_flux_integral "${reweight_fluxfile}" "${proposal_min_gev}" "${proposal_max_gev}")"
-cp "${base_card}" "${run_card}"
+if [ "${sanitize_card}" = 1 ]; then
+  awk '
+    /^[[:space:]]*(sf_nuclearRecoil|sf_CoulombDistortion|sf_src|sf_pb)[[:space:]]*=/ {
+      print "# disabled by analysis/run_nuwro.sh for installed NuWro compatibility: " $0
+      next
+    }
+    { print }
+  ' "${base_card}" > "${run_card}"
+else
+  cp "${base_card}" "${run_card}"
+fi
 
 {
   printf '\n################################################################################\n'
