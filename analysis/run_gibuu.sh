@@ -18,7 +18,7 @@ proposal_max_gev="${proposal_max_gev:-10}"
 proposal_bin_width_gev="${proposal_bin_width_gev:-0.005}"
 skim_final_state="${skim_final_state:-1}"
 
-base_job="${base_job:-${repo_root}/example/GiBUU2025_numu.job}"
+base_job="${base_job:-${repo_root}/analysis/cards/GiBUU2025_numu.job}"
 gibuu_bin="${gibuu_bin:-${repo_root}/../GiBUU/release/testRun/GiBUU.x}"
 gibuu_input="${gibuu_input:-${repo_root}/../GiBUU/buuinput}"
 reweight_fluxfile="${reweight_fluxfile:-$(ana_flux_root "${repo_root}")}"

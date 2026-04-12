@@ -1250,7 +1250,7 @@ void write_summary_md(const TString& path, const TString& status_csv, const TStr
 void expected_event_yields(
     TString status_csv = "analysis/output/matrix/generator_matrix_status.csv",
     TString output_dir = "analysis/output/expected_event_yields",
-    TString flux_file = "example/numi/flux/microboone_numi_flux_5mev.root",
+    TString flux_file = "analysis/flux/microboone_numi_flux_5mev.root",
     double flux_floor_fraction = 0.0,
     double proposal_emin_gev = 0.0,
     double proposal_emax_gev = 10.0,

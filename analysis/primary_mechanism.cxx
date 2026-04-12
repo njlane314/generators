@@ -652,7 +652,7 @@ void primary_mechanism(
     TString generator = "",
     TString knob = "",
     TString working_point = "nominal",
-    TString flux_file = "example/numi/flux/microboone_numi_flux_5mev.root",
+    TString flux_file = "analysis/flux/microboone_numi_flux_5mev.root",
     double flux_floor_fraction = 0.0,
     TString beam_polarity = "combined",
     double proposal_emin_gev = 0.0,

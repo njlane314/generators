@@ -21,5 +21,5 @@ The active generator-loop manifest is `analysis/config/generator_loop_plan.tsv`;
 the flux path mapping used by the local sample runners is in
 `analysis/sample_common.sh`.
 
-The GiBUU example script writes `flat_0_10gev_5mev.dat` at runtime as the
+The GiBUU analysis runner writes `flat_0_10gev_5mev.dat` at runtime as the
 flat proposal spectrum; that generated file is not a NuMI flux file.

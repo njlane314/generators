@@ -174,7 +174,7 @@ void generator_kinematic_envelope(
     TString output_dir = "analysis/output/generator_kinematic_envelope",
     TString variables = "enu q2 w hyperon_p",
     TString selection = "detector_visible_lambda",
-    TString flux_file = "example/numi/flux/microboone_numi_flux_5mev.root",
+    TString flux_file = "analysis/flux/microboone_numi_flux_5mev.root",
     double flux_floor_fraction = 0.0,
     double proposal_emin_gev = 0.0,
     double proposal_emax_gev = 10.0,

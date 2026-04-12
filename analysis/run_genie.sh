@@ -25,7 +25,7 @@ reweight_fluxhisto="${reweight_fluxhisto:-$(ana_flux_hist "${beam_mode}" "${beam
 sample="${sample:-GENIE_${version_label}_NuMI_${beam_mode}_${beam_species}_${interaction}_all_strange_filter_${tune}}"
 outdir="${outdir:-${repo_root}/analysis/output/proxy_flat/GENIE}"
 workdir="${workdir:-${repo_root}/analysis/output/work/GENIE/${sample}}"
-spline="${spline:-${repo_root}/example/samples/${probe}_${target}_${interaction}_${genie_version_tag}_${tune}.xml}"
+spline="${spline:-${repo_root}/analysis/splines/${probe}_${target}_${interaction}_${genie_version_tag}_${tune}.xml}"
 
 ana_check_cmds gevgen gntpc PrepareGENIE nuisflat
 [ "${skim_final_state}" = 1 ] && ana_check_cmds root

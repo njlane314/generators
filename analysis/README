@@ -12,7 +12,7 @@ analysis/run_gibuu.sh
 analysis/run_all.sh
 
 These are analysis-local copies of the example generator runners with paths
-updated to use `example/numi/flux` for the NuMI reweight target, keep the
+updated to use `analysis/flux` for the NuMI reweight target, keep the
 generation proposal flat over 0-10 GeV, and write flat outputs into
 `analysis/output/proxy_flat/<generator>`.  The final output is skimmed by
 `analysis/skim_final_state_hyperon.cxx` to require at least one final-state
@@ -59,7 +59,7 @@ visible momentum thresholds. The default thresholds are p_p > 0.30 GeV and
 p_pi_minus > 0.07 GeV, and can be overridden as the final two wrapper
 arguments:
 
-analysis/run_expected_event_yields.sh analysis/output/matrix/generator_matrix_status.csv analysis/output/expected_event_yields example/numi/flux/microboone_numi_flux_5mev.root 0.0 0.0 10.0 1.0 0.30 0.07
+analysis/run_expected_event_yields.sh analysis/output/matrix/generator_matrix_status.csv analysis/output/expected_event_yields analysis/flux/microboone_numi_flux_5mev.root 0.0 0.0 10.0 1.0 0.30 0.07
 
 This is a truth-level decay/threshold envelope. It does not replace the later
 full geometry, containment, detached-vertex, and Stage C/D reduced-ntuple
@@ -158,23 +158,13 @@ root -l
 root [0] .L analysis/analyser.cxx+
 root [1] analyser("path/to/sample.flat.root", "sample_label").loop()
 
-Topology yields for a generator/knob matrix:
-
-Manifest columns:
-input_flat_root<TAB>generator<TAB>knob<TAB>sample_label
-
-example/numi/analysis/run_strangeness_topology_yield_matrix.sh path/to/manifest.tsv analysis/output/topology_yields.csv
-
-Blank generator or knob fields are inferred from the sample label, then from the input file name.
-The matrix macro also writes analysis/output/topology_yields_uncertainties.csv with statistical uncertainties from sum of weights squared and a knob-envelope systematic uncertainty for each generator and topology.
-
 Primary mechanism study for one inclusive Lambda-topology sample:
 
-root -l -b -q 'analysis/primary_mechanism.cxx+("path/to/inclusive.flat.root","analysis/output","sample_label","GENIE","nominal","nominal","example/numi/flux/microboone_numi_flux_5mev.root",0.0,"fhc",0.0,10.0,"numu")'
+root -l -b -q 'analysis/primary_mechanism.cxx+("path/to/inclusive.flat.root","analysis/output","sample_label","GENIE","nominal","nominal","analysis/flux/microboone_numi_flux_5mev.root",0.0,"fhc",0.0,10.0,"numu")'
 
 Nuclear-exit migration study for one reduced ntuple sample:
 
-root -l -b -q 'analysis/nuclear_exit.cxx+("path/to/reduced.flat.root","analysis/output","sample_label","GENIE","nominal","example/numi/flux/microboone_numi_flux_5mev.root",0.0,"fhc",0.0,10.0,"numu")'
+root -l -b -q 'analysis/nuclear_exit.cxx+("path/to/reduced.flat.root","analysis/output","sample_label","GENIE","nominal","analysis/flux/microboone_numi_flux_5mev.root",0.0,"fhc",0.0,10.0,"numu")'
 
 Use the beam-polarity argument as "fhc", "rhc", or "combined", and pass an optional final beam-species argument as "numu" or "numubar". The matrix loop passes this from `analysis/config/generator_loop_plan.tsv`, so FHC numubar and RHC numu rows use the matching species-specific NuMI flux histograms. The current generator-production strategy is flat in E_nu over 0-10 GeV, so the macros also apply a normalized NuMI flux reweight over that flat proposal range. Optional final arguments can override the proposal range, for example `..., "fhc", 0.0, 10.0, "numu"`.
 

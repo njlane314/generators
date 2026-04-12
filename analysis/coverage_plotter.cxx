@@ -814,7 +814,7 @@ public:
 private:
     TString output_dir_;
     TString selection_ = "final_hyperon";
-    TString flux_file_ = "example/numi/flux/microboone_numi_flux_5mev.root";
+    TString flux_file_ = "analysis/flux/microboone_numi_flux_5mev.root";
     double proposal_emin_ = 0.0;
     double proposal_emax_ = 10.0;
     double proton_threshold_ = 0.30;
@@ -1348,7 +1348,7 @@ void plot_kinematic_coverage(
     TString output_stem = "coverage",
     TString pair_ids = "enu_q2 enu_w q2_w enu_lambda_p w_lambda_p lambda_p_costheta",
     TString selection = "final_hyperon",
-    TString flux_file = "example/numi/flux/microboone_numi_flux_5mev.root",
+    TString flux_file = "analysis/flux/microboone_numi_flux_5mev.root",
     double proposal_emin_gev = 0.0,
     double proposal_emax_gev = 10.0,
     double proton_threshold_gev = 0.30,
@@ -1374,7 +1374,7 @@ void coverage_plotter(
     TString output_stem = "coverage",
     TString pair_ids = "enu_q2 enu_w q2_w enu_lambda_p w_lambda_p lambda_p_costheta",
     TString selection = "final_hyperon",
-    TString flux_file = "example/numi/flux/microboone_numi_flux_5mev.root",
+    TString flux_file = "analysis/flux/microboone_numi_flux_5mev.root",
     double proposal_emin_gev = 0.0,
     double proposal_emax_gev = 10.0,
     double proton_threshold_gev = 0.30,
@@ -1400,7 +1400,7 @@ void plot_enu_q2_coverage(
     TString labels_or_groupings = "variation beam generator",
     TString output_stem = "enu_q2_coverage",
     TString selection = "final_hyperon",
-    TString flux_file = "example/numi/flux/microboone_numi_flux_5mev.root",
+    TString flux_file = "analysis/flux/microboone_numi_flux_5mev.root",
     double proposal_emin_gev = 0.0,
     double proposal_emax_gev = 10.0,
     double proton_threshold_gev = 0.30,

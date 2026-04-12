@@ -20,7 +20,7 @@ proposal_max_gev="${proposal_max_gev:-10}"
 proposal_bin_width_gev="${proposal_bin_width_gev:-0.005}"
 skim_final_state="${skim_final_state:-1}"
 
-base_card="${base_card:-${repo_root}/example/NuWroCard_CC_Ar_numu.txt}"
+base_card="${base_card:-${repo_root}/analysis/cards/NuWroCard_CC_Ar_numu.txt}"
 reweight_fluxfile="${reweight_fluxfile:-$(ana_flux_dat "${repo_root}" "${beam_mode}" "${beam_species}")}"
 sample="${sample:-NuWro_${version}_NuMI_${beam_mode}_${beam_species}_${interaction}_${knob}_filter_${fsi_state}}"
 outdir="${outdir:-${repo_root}/analysis/output/proxy_flat/NuWro}"

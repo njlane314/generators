@@ -17,7 +17,7 @@ groups="${3:-variation beam generator}"
 stem="${4:-coverage}"
 pairs="${5:-enu_q2 enu_w q2_w enu_lambda_p w_lambda_p lambda_p_costheta}"
 assumptions="${6:-default}"
-flux="${7:-example/numi/flux/microboone_numi_flux_5mev.root}"
+flux="${7:-analysis/flux/microboone_numi_flux_5mev.root}"
 emin="${8:-0.0}"
 emax="${9:-10.0}"
 

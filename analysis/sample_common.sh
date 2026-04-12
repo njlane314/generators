@@ -71,7 +71,7 @@ ana_genie_version_tag() {
 }
 
 ana_flux_root() {
-  printf '%s/example/numi/flux/microboone_numi_flux_5mev.root\n' "$1"
+  printf '%s/analysis/flux/microboone_numi_flux_5mev.root\n' "$1"
 }
 
 ana_flux_hist() {
@@ -92,7 +92,7 @@ ana_flux_dat() {
   species="$3"
   case "${mode}:${species}" in
     fhc:numu|fhc:numubar|rhc:numu|rhc:numubar)
-      printf '%s/example/numi/flux/gibuu_numi_%s_%s.dat\n' "$1" "${mode}" "${species}"
+      printf '%s/analysis/flux/gibuu_numi_%s_%s.dat\n' "$1" "${mode}" "${species}"
       ;;
     *) ana_die "unsupported flux beam/species: $2/$3" ;;
   esac
