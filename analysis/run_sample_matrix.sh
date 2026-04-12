@@ -11,36 +11,13 @@ skip_existing="${skip_existing:-0}"
 generator_filter="${generator_filter:-}"
 max_samples="${max_samples:-0}"
 seed_base="${seed_base:-1000}"
-batch_events_was_set=0
-if [ -n "${batch_events+x}" ]; then
-  batch_events_was_set=1
-else
-  batch_events="${events}"
-fi
-batch_events_min="${batch_events_min:-1000}"
-max_batches="${max_batches:-200}"
 gibuu_events_per_ensemble="${gibuu_events_per_ensemble:-5}"
-target_events="${events}"
+proposal_events="${events}"
 
-case "${target_events}" in
-  ''|*[!0-9]*) printf 'ERROR: events must be a positive integer selected-event target\n' >&2; exit 1 ;;
+case "${proposal_events}" in
+  ''|*[!0-9]*) printf 'ERROR: events must be a positive integer proposal-event count\n' >&2; exit 1 ;;
 esac
-[ "${target_events}" -gt 0 ] || { printf 'ERROR: events must be > 0\n' >&2; exit 1; }
-case "${batch_events_min}" in
-  ''|*[!0-9]*) printf 'ERROR: batch_events_min must be a positive integer\n' >&2; exit 1 ;;
-esac
-[ "${batch_events_min}" -gt 0 ] || { printf 'ERROR: batch_events_min must be > 0\n' >&2; exit 1; }
-case "${batch_events}" in
-  ''|*[!0-9]*) printf 'ERROR: batch_events must be a positive integer\n' >&2; exit 1 ;;
-esac
-[ "${batch_events}" -gt 0 ] || { printf 'ERROR: batch_events must be > 0\n' >&2; exit 1; }
-if [ "${batch_events_was_set}" = 0 ] && [ "${batch_events}" -lt "${batch_events_min}" ]; then
-  batch_events="${batch_events_min}"
-fi
-case "${max_batches}" in
-  ''|*[!0-9]*) printf 'ERROR: max_batches must be a positive integer\n' >&2; exit 1 ;;
-esac
-[ "${max_batches}" -gt 0 ] || { printf 'ERROR: max_batches must be > 0\n' >&2; exit 1; }
+[ "${proposal_events}" -gt 0 ] || { printf 'ERROR: events must be > 0\n' >&2; exit 1; }
 case "${gibuu_events_per_ensemble}" in
   ''|*[!0-9]*) printf 'ERROR: gibuu_events_per_ensemble must be a positive integer\n' >&2; exit 1 ;;
 esac
@@ -70,53 +47,50 @@ expand_template() {
   printf '%s\n' "${text}"
 }
 
-join_csv() {
-  local IFS=,
-  printf '%s' "$*"
-}
-
-run_generator_batch() {
+run_generator_sample() {
   local n="$1"
-  local batch="$2"
-  local batch_sample="$3"
-  local batch_outdir="$4"
-  local batch_workdir="$5"
-  local batch_count_file="$6"
+  local sample_label="$2"
+  local output_path="$3"
+  local selected_count_path="$4"
+  local outdir workdir
+
+  outdir="$(dirname "${output_path}")"
+  workdir="${repo_root}/analysis/output/work/${generator}/${sample_label}"
 
   case "${generator}" in
     GENIE)
-      events="${batch_events}" \
+      events="${proposal_events}" \
       version="${version}" \
       tune="${knob}" \
       beam_mode="${beam_mode}" \
       beam_species="${species}" \
       interaction="${interaction}" \
-      run="$((seed_base + n * 1000 + batch))" \
-      sample="${batch_sample}" \
-      outdir="${batch_outdir}" \
-      workdir="${batch_workdir}" \
+      run="$((seed_base + n))" \
+      sample="${sample_label}" \
+      outdir="${outdir}" \
+      workdir="${workdir}" \
       skim_final_state=1 \
-      skim_count_path="${batch_count_file}" \
+      skim_count_path="${selected_count_path}" \
       "${script_dir}/run_genie.sh"
       ;;
     NuWro)
-      events="${batch_events}" \
-      seed="$((seed_base + n * 1000 + batch))" \
+      events="${proposal_events}" \
+      seed="$((seed_base + n))" \
       version="${version}" \
       knob="${knob}" \
       beam_mode="${beam_mode}" \
       beam_species="${species}" \
       interaction="${interaction}" \
       fsi_state="${fsi_state}" \
-      sample="${batch_sample}" \
-      outdir="${batch_outdir}" \
-      workdir="${batch_workdir}" \
+      sample="${sample_label}" \
+      outdir="${outdir}" \
+      workdir="${workdir}" \
       skim_final_state=1 \
-      skim_count_path="${batch_count_file}" \
+      skim_count_path="${selected_count_path}" \
       "${script_dir}/run_nuwro.sh"
       ;;
     GiBUU)
-      events="${batch_events}" \
+      events="${proposal_events}" \
       gibuu_events_per_ensemble="${gibuu_events_per_ensemble}" \
       num_runs_same_energy="${num_runs_same_energy:-1}" \
       version="${version}" \
@@ -125,11 +99,11 @@ run_generator_batch() {
       beam_species="${species}" \
       interaction="${interaction}" \
       fsi_state="${fsi_state}" \
-      sample="${batch_sample}" \
-      outdir="${batch_outdir}" \
-      workdir="${batch_workdir}" \
+      sample="${sample_label}" \
+      outdir="${outdir}" \
+      workdir="${workdir}" \
       skim_final_state=1 \
-      skim_count_path="${batch_count_file}" \
+      skim_count_path="${selected_count_path}" \
       "${script_dir}/run_gibuu.sh"
       ;;
     *)
@@ -141,10 +115,10 @@ run_generator_batch() {
 
 run_sample() {
   local n="$1"
-  local output_path sample_label reject_dir batch selected batch_sample batch_outdir batch_workdir batch_flat batch_count_file batch_selected count_file merged_inputs note
-  local selected_files=()
+  local output_path sample_label selected_count_path selected note
   output_path="${repo_root}/$(expand_template "${input_template}")"
   sample_label="$(expand_template "${sample_template}")"
+  selected_count_path="${repo_root}/analysis/output/work/${generator}/${sample_label}/${sample_label}.selected.count"
 
   if [ "${skip_existing}" = 1 ] && [ -s "${output_path}" ]; then
     printf 'skip existing [%04d] %s\n' "${n}" "${output_path}"
@@ -156,52 +130,25 @@ run_sample() {
     if [ -n "${num_ensembles:-}" ]; then
       note=" num_ensembles=${num_ensembles}"
     else
-      note=" corrected_num_ensembles=$(( (batch_events + gibuu_events_per_ensemble - 1) / gibuu_events_per_ensemble ))"
+      note=" corrected_num_ensembles=$(( (proposal_events + gibuu_events_per_ensemble - 1) / gibuu_events_per_ensemble ))"
     fi
   fi
-  printf 'sample [%04d] %s version=%s knob=%s beam=%s species=%s interaction=%s fsi=%s target_selected=%s batch_events=%s max_batches=%s%s\n' \
-    "${n}" "${generator}" "${version}" "${knob}" "${beam_mode}" "${species}" "${interaction}" "${fsi_state}" "${target_events}" "${batch_events}" "${max_batches}" "${note}"
+  printf 'sample [%04d] %s version=%s knob=%s beam=%s species=%s interaction=%s fsi=%s proposal_events=%s%s\n' \
+    "${n}" "${generator}" "${version}" "${knob}" "${beam_mode}" "${species}" "${interaction}" "${fsi_state}" "${proposal_events}" "${note}"
 
   if [ "${dry_run}" = 1 ]; then
     return 0
   fi
 
-  reject_dir="${repo_root}/analysis/output/work/rejection/${sample_label}"
-  rm -rf "${reject_dir}"
-  mkdir -p "${reject_dir}/selected" "$(dirname "${output_path}")"
+  rm -rf "${repo_root}/analysis/output/work/${generator}/${sample_label}"
+  run_generator_sample "${n}" "${sample_label}" "${output_path}" "${selected_count_path}"
 
-  selected=0
-  batch=0
-  while [ "${selected}" -lt "${target_events}" ] && [ "${batch}" -lt "${max_batches}" ]; do
-    batch=$((batch + 1))
-    batch_sample="${sample_label}.batch_${batch}"
-    batch_outdir="${reject_dir}/selected"
-    batch_workdir="${reject_dir}/work_${batch}"
-    batch_flat="${batch_outdir}/${batch_sample}.flat.root"
-    batch_count_file="${batch_outdir}/${batch_sample}.count"
-
-    run_generator_batch "${n}" "${batch}" "${batch_sample}" "${batch_outdir}" "${batch_workdir}" "${batch_count_file}"
-    selected_files+=("${batch_flat}")
-
-    [ -s "${batch_count_file}" ] || { printf 'ERROR: missing selected-event count: %s\n' "${batch_count_file}" >&2; exit 1; }
-    batch_selected="$(cat "${batch_count_file}")"
-    case "${batch_selected}" in
-      ''|*[!0-9]*) printf 'ERROR: invalid selected-event count in %s: %s\n' "${batch_count_file}" "${batch_selected}" >&2; exit 1 ;;
-    esac
-    selected=$((selected + batch_selected))
-    printf 'selected [%04d] %s: %s/%s after %s batch(es); last batch +%s\n' "${n}" "${sample_label}" "${selected}" "${target_events}" "${batch}" "${batch_selected}"
-  done
-
-  [ "${selected}" -ge "${target_events}" ] || {
-    printf 'ERROR: only selected %s/%s events for %s after %s batches\n' "${selected}" "${target_events}" "${sample_label}" "${max_batches}" >&2
-    exit 1
-  }
-
-  count_file="${reject_dir}/selected.count"
-  merged_inputs="$(join_csv "${selected_files[@]}")"
-  ana_skim_final_state_hyperon "${script_dir}/skim_final_state_hyperon.cxx" "${merged_inputs}" "${output_path}" "${target_events}" "${count_file}"
-  selected="$(cat "${count_file}")"
-  printf 'final selected [%04d] %s: %s/%s -> %s\n' "${n}" "${sample_label}" "${selected}" "${target_events}" "${output_path}"
+  [ -s "${selected_count_path}" ] || { printf 'ERROR: missing selected-event count: %s\n' "${selected_count_path}" >&2; exit 1; }
+  selected="$(cat "${selected_count_path}")"
+  case "${selected}" in
+    ''|*[!0-9]*) printf 'ERROR: invalid selected-event count in %s: %s\n' "${selected_count_path}" "${selected}" >&2; exit 1 ;;
+  esac
+  printf 'selected [%04d] %s: %s/%s proposal events -> %s\n' "${n}" "${sample_label}" "${selected}" "${proposal_events}" "${output_path}"
 }
 
 [ -r "${plan}" ] || { printf 'ERROR: missing plan: %s\n' "${plan}" >&2; exit 1; }
