@@ -19,6 +19,7 @@ run="${run:-1}"
 proposal_min_gev="${proposal_min_gev:-0}"
 proposal_max_gev="${proposal_max_gev:-10}"
 skim_final_state="${skim_final_state:-1}"
+make_spline="${make_spline:-auto}"
 
 reweight_fluxfile="${reweight_fluxfile:-$(ana_flux_root "${repo_root}")}"
 reweight_fluxhisto="${reweight_fluxhisto:-$(ana_flux_hist "${beam_mode}" "${beam_species}")}"
@@ -29,8 +30,26 @@ spline="${spline:-${repo_root}/analysis/splines/${probe}_${target}_${interaction
 
 ana_check_cmds gevgen gntpc PrepareGENIE nuisflat
 [ "${skim_final_state}" = 1 ] && ana_check_cmds root
-ana_check_files "${spline}" "${reweight_fluxfile}"
 mkdir -p "${outdir}" "${workdir}"
+
+if [ ! -s "${spline}" ]; then
+  case "${make_spline}" in
+    1|true|TRUE|yes|YES|auto)
+      ana_check_cmds gmkspl
+      mkdir -p "$(dirname "${spline}")"
+      gmkspl \
+        -p "${probe}" \
+        -t "${target}" \
+        -e "${proposal_max_gev}" \
+        -o "${spline}" \
+        --tune "${tune}" \
+        --event-generator-list "${interaction}"
+      ;;
+    *) ;;
+  esac
+fi
+
+ana_check_files "${spline}" "${reweight_fluxfile}"
 
 ghep="${workdir}/${sample}.ghep.root"
 gst="${workdir}/${sample}.gst.root"
