@@ -20,13 +20,13 @@ if [[ ! -f "${input}" ]]; then
 fi
 
 if [[ -z "${output}" && -z "${label}" && -z "${generator}" && -z "${knob}" ]]; then
-  root -l -b -q "${script_dir}/strangeness_topology_yields.cxx+(\"${input}\")"
+  root -l -b -q "${script_dir}/topology_yields.cxx+(\"${input}\")"
 elif [[ -z "${label}" && -z "${generator}" && -z "${knob}" ]]; then
-  root -l -b -q "${script_dir}/strangeness_topology_yields.cxx+(\"${input}\",\"${output}\")"
+  root -l -b -q "${script_dir}/topology_yields.cxx+(\"${input}\",\"${output}\")"
 elif [[ -z "${generator}" && -z "${knob}" ]]; then
-  root -l -b -q "${script_dir}/strangeness_topology_yields.cxx+(\"${input}\",\"${output}\",\"${label}\")"
+  root -l -b -q "${script_dir}/topology_yields.cxx+(\"${input}\",\"${output}\",\"${label}\")"
 elif [[ -z "${knob}" ]]; then
-  root -l -b -q "${script_dir}/strangeness_topology_yields.cxx+(\"${input}\",\"${output}\",\"${label}\",\"${generator}\")"
+  root -l -b -q "${script_dir}/topology_yields.cxx+(\"${input}\",\"${output}\",\"${label}\",\"${generator}\")"
 else
-  root -l -b -q "${script_dir}/strangeness_topology_yields.cxx+(\"${input}\",\"${output}\",\"${label}\",\"${generator}\",\"${knob}\")"
+  root -l -b -q "${script_dir}/topology_yields.cxx+(\"${input}\",\"${output}\",\"${label}\",\"${generator}\",\"${knob}\")"
 fi

@@ -18,50 +18,5 @@ if [[ ! -f "${manifest}" ]]; then
   exit 1
 fi
 
-tmpdir="$(mktemp -d)"
-trap 'rm -rf "${tmpdir}"' EXIT
-
 mkdir -p "$(dirname "${output}")"
-rm -f "${output}"
-
-line_number=0
-written_header=0
-
-while IFS=$'\t' read -r input generator knob sample_label extra || [[ -n "${input:-}" ]]; do
-  line_number=$((line_number + 1))
-
-  [[ -z "${input// }" ]] && continue
-  [[ "${input}" == \#* ]] && continue
-
-  if [[ -n "${extra:-}" ]]; then
-    echo "ERROR: too many columns in ${manifest}:${line_number}" >&2
-    exit 1
-  fi
-
-  generator="${generator:-}"
-  knob="${knob:-}"
-  sample_label="${sample_label:-}"
-
-  if [[ ! -f "${input}" ]]; then
-    echo "ERROR: missing input flat tree in ${manifest}:${line_number}: ${input}" >&2
-    exit 1
-  fi
-
-  tmp_csv="${tmpdir}/sample_${line_number}.csv"
-  "${script_dir}/run_strangeness_topology_yields.sh" \
-    "${input}" "${tmp_csv}" "${sample_label}" "${generator}" "${knob}"
-
-  if [[ "${written_header}" == "0" ]]; then
-    cat "${tmp_csv}" > "${output}"
-    written_header=1
-  else
-    tail -n +2 "${tmp_csv}" >> "${output}"
-  fi
-done < "${manifest}"
-
-if [[ "${written_header}" == "0" ]]; then
-  echo "ERROR: manifest had no samples: ${manifest}" >&2
-  exit 1
-fi
-
-echo "Wrote ${output}"
+root -l -b -q "${script_dir}/yield_matrix.cxx+(\"${manifest}\",\"${output}\")"
