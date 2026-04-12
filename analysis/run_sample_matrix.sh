@@ -11,7 +11,13 @@ skip_existing="${skip_existing:-0}"
 generator_filter="${generator_filter:-}"
 max_samples="${max_samples:-0}"
 seed_base="${seed_base:-1000}"
-batch_events="${batch_events:-${events}}"
+batch_events_was_set=0
+if [ -n "${batch_events+x}" ]; then
+  batch_events_was_set=1
+else
+  batch_events="${events}"
+fi
+batch_events_min="${batch_events_min:-1000}"
 max_batches="${max_batches:-200}"
 gibuu_events_per_ensemble="${gibuu_events_per_ensemble:-5}"
 target_events="${events}"
@@ -20,10 +26,17 @@ case "${target_events}" in
   ''|*[!0-9]*) printf 'ERROR: events must be a positive integer selected-event target\n' >&2; exit 1 ;;
 esac
 [ "${target_events}" -gt 0 ] || { printf 'ERROR: events must be > 0\n' >&2; exit 1; }
+case "${batch_events_min}" in
+  ''|*[!0-9]*) printf 'ERROR: batch_events_min must be a positive integer\n' >&2; exit 1 ;;
+esac
+[ "${batch_events_min}" -gt 0 ] || { printf 'ERROR: batch_events_min must be > 0\n' >&2; exit 1; }
 case "${batch_events}" in
   ''|*[!0-9]*) printf 'ERROR: batch_events must be a positive integer\n' >&2; exit 1 ;;
 esac
 [ "${batch_events}" -gt 0 ] || { printf 'ERROR: batch_events must be > 0\n' >&2; exit 1; }
+if [ "${batch_events_was_set}" = 0 ] && [ "${batch_events}" -lt "${batch_events_min}" ]; then
+  batch_events="${batch_events_min}"
+fi
 case "${max_batches}" in
   ''|*[!0-9]*) printf 'ERROR: max_batches must be a positive integer\n' >&2; exit 1 ;;
 esac
@@ -68,6 +81,7 @@ run_generator_batch() {
   local batch_sample="$3"
   local batch_outdir="$4"
   local batch_workdir="$5"
+  local batch_count_file="$6"
 
   case "${generator}" in
     GENIE)
@@ -82,6 +96,7 @@ run_generator_batch() {
       outdir="${batch_outdir}" \
       workdir="${batch_workdir}" \
       skim_final_state=1 \
+      skim_count_path="${batch_count_file}" \
       "${script_dir}/run_genie.sh"
       ;;
     NuWro)
@@ -97,6 +112,7 @@ run_generator_batch() {
       outdir="${batch_outdir}" \
       workdir="${batch_workdir}" \
       skim_final_state=1 \
+      skim_count_path="${batch_count_file}" \
       "${script_dir}/run_nuwro.sh"
       ;;
     GiBUU)
@@ -113,6 +129,7 @@ run_generator_batch() {
       outdir="${batch_outdir}" \
       workdir="${batch_workdir}" \
       skim_final_state=1 \
+      skim_count_path="${batch_count_file}" \
       "${script_dir}/run_gibuu.sh"
       ;;
     *)
@@ -124,7 +141,7 @@ run_generator_batch() {
 
 run_sample() {
   local n="$1"
-  local output_path sample_label reject_dir batch selected batch_sample batch_outdir batch_workdir batch_flat count_file merged_inputs note
+  local output_path sample_label reject_dir batch selected batch_sample batch_outdir batch_workdir batch_flat batch_count_file batch_selected count_file merged_inputs note
   local selected_files=()
   output_path="${repo_root}/$(expand_template "${input_template}")"
   sample_label="$(expand_template "${sample_template}")"
@@ -161,21 +178,30 @@ run_sample() {
     batch_outdir="${reject_dir}/selected"
     batch_workdir="${reject_dir}/work_${batch}"
     batch_flat="${batch_outdir}/${batch_sample}.flat.root"
+    batch_count_file="${batch_outdir}/${batch_sample}.count"
 
-    run_generator_batch "${n}" "${batch}" "${batch_sample}" "${batch_outdir}" "${batch_workdir}"
+    run_generator_batch "${n}" "${batch}" "${batch_sample}" "${batch_outdir}" "${batch_workdir}" "${batch_count_file}"
     selected_files+=("${batch_flat}")
 
-    count_file="${reject_dir}/selected.count"
-    merged_inputs="$(join_csv "${selected_files[@]}")"
-    ana_skim_final_state_hyperon "${script_dir}/skim_final_state_hyperon.cxx" "${merged_inputs}" "${output_path}" "${target_events}" "${count_file}"
-    selected="$(cat "${count_file}")"
-    printf 'selected [%04d] %s: %s/%s after %s batch(es)\n' "${n}" "${sample_label}" "${selected}" "${target_events}" "${batch}"
+    [ -s "${batch_count_file}" ] || { printf 'ERROR: missing selected-event count: %s\n' "${batch_count_file}" >&2; exit 1; }
+    batch_selected="$(cat "${batch_count_file}")"
+    case "${batch_selected}" in
+      ''|*[!0-9]*) printf 'ERROR: invalid selected-event count in %s: %s\n' "${batch_count_file}" "${batch_selected}" >&2; exit 1 ;;
+    esac
+    selected=$((selected + batch_selected))
+    printf 'selected [%04d] %s: %s/%s after %s batch(es); last batch +%s\n' "${n}" "${sample_label}" "${selected}" "${target_events}" "${batch}" "${batch_selected}"
   done
 
   [ "${selected}" -ge "${target_events}" ] || {
     printf 'ERROR: only selected %s/%s events for %s after %s batches\n' "${selected}" "${target_events}" "${sample_label}" "${max_batches}" >&2
     exit 1
   }
+
+  count_file="${reject_dir}/selected.count"
+  merged_inputs="$(join_csv "${selected_files[@]}")"
+  ana_skim_final_state_hyperon "${script_dir}/skim_final_state_hyperon.cxx" "${merged_inputs}" "${output_path}" "${target_events}" "${count_file}"
+  selected="$(cat "${count_file}")"
+  printf 'final selected [%04d] %s: %s/%s -> %s\n' "${n}" "${sample_label}" "${selected}" "${target_events}" "${output_path}"
 }
 
 [ -r "${plan}" ] || { printf 'ERROR: missing plan: %s\n' "${plan}" >&2; exit 1; }

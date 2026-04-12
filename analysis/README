@@ -21,11 +21,13 @@ each generator, then runs the generator matrix, expected-yield, and
 phenomenology-sensitivity steps.  `events` is the requested number of selected
 final-state hyperon events; the sample matrix runner always rejection-samples
 inclusive generator batches until the final skim reaches that target.  Increase
-`batch_events` if you want larger proposal batches per rejection iteration, and
-increase `max_batches` if a rare configuration needs more attempts.  GiBUU
-batches correct `numEnsembles` by `gibuu_events_per_ensemble=5` by default so
-its proposal flat-tree entry count is comparable to GENIE and NuWro for the
-same `batch_events`.  Set `run_plots=1` to also exercise the
+`batch_events` if you want larger proposal batches per rejection iteration; if
+you do not set it, the default is at least `batch_events_min=1000` to avoid many
+small generator restarts.  Increase `max_batches` if a rare configuration needs
+more attempts.  GiBUU batches correct `numEnsembles` by
+`gibuu_events_per_ensemble=5` by default so its proposal flat-tree entry count
+is comparable to GENIE and NuWro for the same `batch_events`.  Set `run_plots=1`
+to also exercise the
 kinematic-envelope and coverage plot macros.  Use
 `plan=analysis/config/generator_loop_plan.tsv` only when you want the full
 60-sample matrix.  Set `dry_run=1` on `analysis/run_sample_matrix.sh` to print

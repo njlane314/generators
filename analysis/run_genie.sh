@@ -81,4 +81,4 @@ gevgen \
 gntpc -f gst -i "${ghep}" -o "${gst}" --tune "${tune}"
 PrepareGENIE -i "${ghep}" -f "${proposal_min_gev},${proposal_max_gev},${proposal_bin_width_gev}" -t "${target}[1]" -o "${prep}"
 nuisflat -i "GENIE:${prep}" -o "${raw_flat}"
-[ "${skim_final_state}" = 1 ] && ana_skim_final_state_hyperon "${script_dir}/skim_final_state_hyperon.cxx" "${raw_flat}" "${flat}"
+[ "${skim_final_state}" = 1 ] && ana_skim_final_state_hyperon "${script_dir}/skim_final_state_hyperon.cxx" "${raw_flat}" "${flat}" -1 "${skim_count_path:-}"

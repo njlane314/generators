@@ -165,4 +165,4 @@ printf '  output: %s\n' "${flat}"
   PrepareGiBUU -i "${gibuu_event_root}" -f "${reweight_fluxfile},${reweight_fluxhisto}" -o "${prep}"
   nuisflat -i "GiBUU:${prep}" -o "${raw_flat}"
 )
-[ "${skim_final_state}" = 1 ] && ana_skim_final_state_hyperon "${script_dir}/skim_final_state_hyperon.cxx" "${raw_flat}" "${flat}"
+[ "${skim_final_state}" = 1 ] && ana_skim_final_state_hyperon "${script_dir}/skim_final_state_hyperon.cxx" "${raw_flat}" "${flat}" -1 "${skim_count_path:-}"
