@@ -134,6 +134,9 @@ ana_flux_integral() {
 
 ana_skim_final_state_hyperon() {
   ana_check_cmds root
-  root -l -b -q "$1(\"$2\",\"$3\")"
+  local max_entries count_path
+  max_entries="${4:--1}"
+  count_path="${5:-}"
+  root -l -b -q "$1(\"$2\",\"$3\",\"FlatTree_VARS\",${max_entries},\"${count_path}\")"
   [ -s "$3" ] || ana_die "skim did not write output: $3"
 }

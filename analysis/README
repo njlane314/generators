@@ -18,7 +18,12 @@ events=100 analysis/run_pipeline_smoke.sh
 This expands the three-sample smoke plan in
 `analysis/config/generator_smoke_plan.tsv`, writes one FHC numu proxy flat for
 each generator, then runs the generator matrix, expected-yield, and
-phenomenology-sensitivity steps.  Set `run_plots=1` to also exercise the
+phenomenology-sensitivity steps.  `events` is the requested number of selected
+final-state hyperon events; the sample matrix runner always rejection-samples
+inclusive generator batches until the final skim reaches that target.  Increase
+`batch_events` if you want larger proposal batches per rejection iteration, and
+increase `max_batches` if a rare configuration needs more attempts.  Set
+`run_plots=1` to also exercise the
 kinematic-envelope and coverage plot macros.  Use
 `plan=analysis/config/generator_loop_plan.tsv` only when you want the full
 60-sample matrix.  Set `dry_run=1` on `analysis/run_sample_matrix.sh` to print
@@ -27,10 +32,9 @@ the selected sample list without running generators.
 These are analysis-local copies of the example generator runners with paths
 updated to use `analysis/flux` for the NuMI reweight target, keep the
 generation proposal flat over 0-10 GeV, and write flat outputs into
-`analysis/output/proxy_flat/<generator>`.  The final output is skimmed by
-`analysis/skim_final_state_hyperon.cxx` to require at least one final-state
-Lambda, Sigma0, Xi0, Xi-, or Omega- with no momentum cut.  Set
-`skim_final_state=0` to keep inclusive debug flats.
+`analysis/output/proxy_flat/<generator>`.  Matrix production always writes final
+outputs selected by `analysis/skim_final_state_hyperon.cxx`, requiring at least
+one final-state Lambda, Sigma0, Xi0, Xi-, or Omega- with no momentum cut.
 
 The loop is manifest-driven by `analysis/config/generator_loop_plan.tsv`. It expands
 generator, version, knob/config, beam mode, beam species, interaction, and FSI
