@@ -11,18 +11,19 @@ analysis/run_nuwro.sh
 analysis/run_gibuu.sh
 analysis/run_all.sh
 
-Run a first 100-proposal-event sample-matrix smoke production and core macro test:
-
-events=100 analysis/run_pipeline_smoke.sh
-
-Run the first production milestone, which generates 10,000 proposal events in
-each active full-matrix sample and stops before the derived analysis steps:
+Run the local 10,000 proposal-event generation for each active full-matrix
+sample:
 
 analysis/run_milestone_10k.sh
 
-That wrapper is just:
+Equivalently, the default pipeline now does the same local generation-only
+run:
 
-analysis/run_pipeline.sh analysis/config/milestone_10k.env
+analysis/run_pipeline.sh
+
+Check the full 44-sample local generation list without running generators:
+
+dry_run=1 analysis/run_pipeline.sh
 
 Set `run_analysis=1` with the same config after the 10k flat files exist to run
 the generator matrix, expected-yield tables, and phenomenology-sensitivity
@@ -30,27 +31,18 @@ summary over those samples:
 
 run_analysis=1 produce_samples=0 analysis/run_pipeline.sh analysis/config/milestone_10k.env
 
-This expands the three-sample smoke plan in
-`analysis/config/generator_smoke_plan.tsv`, writes one FHC numu proxy flat for
-each generator, then runs the generator matrix, expected-yield, and
-phenomenology-sensitivity steps.  `events` is the fixed proposal exposure per
-configuration.  The sample matrix runner generates each inclusive flat sample
+This expands `analysis/config/generator_loop_plan.tsv`, which is the full
+44-row analysis matrix. `events` is the fixed proposal exposure per
+configuration. The sample matrix runner generates each inclusive flat sample
 once, skims final-state hyperons from that proposal, and lets the selected count
-float; downstream yield tables carry the resulting statistical uncertainty.  For
-a quick but less sparse comparison use a larger proposal exposure, for example
-`events=2500 analysis/run_pipeline_smoke.sh`.  GiBUU corrects `numEnsembles` by
-`gibuu_events_per_ensemble=5` by default so its proposal flat-tree entry count is
-comparable to GENIE and NuWro for the same `events`.  Set `run_plots=1` to also
-exercise the
-kinematic-envelope and coverage plot macros.  Use
-`plan=analysis/config/generator_loop_plan.tsv` only when you want the full
-44-row analysis matrix.  The sample runners now generate directly from the
-matching NuMI flux for each FHC/RHC and species row; the matrix and yield
-steps then use the generated sample weights and the configured analysis energy
-window.  With the current full plan this means 44 analysis rows and 44
-generated NuMI-beam samples.
-Set `dry_run=1` on `analysis/run_sample_matrix.sh` to print the proposal sample
-list without running generators.
+float; downstream yield tables carry the resulting statistical uncertainty.
+GiBUU corrects `numEnsembles` by `gibuu_events_per_ensemble=5` by default so its
+proposal flat-tree entry count is comparable to GENIE and NuWro for the same
+`events`. Set `run_plots=1` when running the derived analysis to also exercise
+the kinematic-envelope and coverage plot macros. The sample runners generate
+directly from the matching NuMI flux for each FHC/RHC and species row; the
+matrix and yield steps then use the generated sample weights and the configured
+analysis energy window.
 
 These are analysis-local copies of the example generator runners with paths
 updated to use `analysis/flux` as the generator-time NuMI flux input and write flat outputs into

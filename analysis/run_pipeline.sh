@@ -9,7 +9,8 @@ Usage: analysis/run_pipeline.sh [CONFIG_ENV]
 
 CONFIG_ENV is an optional shell environment file such as
 analysis/config/milestone_10k.env. Values in the caller environment still win
-over defaults set by the config file.
+over defaults set by the config file. With no config, this runs local 10,000
+proposal-event generation for every active row in generator_loop_plan.tsv.
 EOF
   exit 1
 fi
@@ -21,15 +22,15 @@ if [ -n "${config}" ]; then
   . "${config}"
 fi
 
-events="${events:-100}"
+events="${events:-10000}"
 produce_samples="${produce_samples:-1}"
-run_analysis="${run_analysis:-1}"
+run_analysis="${run_analysis:-0}"
 run_plots="${run_plots:-0}"
 dry_run="${dry_run:-0}"
-plan="${plan:-${script_dir}/config/generator_smoke_plan.tsv}"
-matrix_dir="${matrix_dir:-analysis/output/matrix}"
-yield_dir="${yield_dir:-analysis/output/expected_event_yields}"
-sensitivity_dir="${sensitivity_dir:-analysis/output/phenomenology_sensitivity}"
+plan="${plan:-${script_dir}/config/generator_loop_plan.tsv}"
+matrix_dir="${matrix_dir:-analysis/output/milestone_10k/matrix}"
+yield_dir="${yield_dir:-analysis/output/milestone_10k/expected_event_yields}"
+sensitivity_dir="${sensitivity_dir:-analysis/output/milestone_10k/phenomenology_sensitivity}"
 
 printf 'Pipeline plan: %s\n' "${plan}"
 printf '  proposal events per sample: %s\n' "${events}"
