@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -gt 9 ]]; then
+if [[ $# -gt 6 ]]; then
   cat >&2 <<'EOF'
-Usage: analysis/run_detector_visibility_coverage.sh [INPUT_SOURCE] [OUTPUT_DIR] [GROUPINGS] [OUTPUT_STEM] [PAIRS] [ASSUMPTIONS] [FLUX_FILE] [EMIN] [EMAX]
+Usage: analysis/run_detector_visibility_coverage.sh [INPUT_SOURCE] [OUTPUT_DIR] [GROUPINGS] [OUTPUT_STEM] [PAIRS] [ASSUMPTIONS]
 
 ASSUMPTIONS is a comma list of label:selection:p_proton:p_piminus rows.
 Use "default" for truth, branching, loose, nominal, and tight.
@@ -17,9 +17,6 @@ groups="${3:-variation beam generator}"
 stem="${4:-coverage}"
 pairs="${5:-enu_q2 enu_w q2_w enu_lambda_p w_lambda_p lambda_p_costheta}"
 assumptions="${6:-default}"
-flux="${7-analysis/flux/microboone_numi_flux_5mev.root}"
-emin="${8:-0.0}"
-emax="${9:-10.0}"
 
 mkdir -p "${out}"
 manifest="${out}/detector_visibility_coverage_assumptions.tsv"
@@ -35,7 +32,7 @@ run_one() {
   safe_label="$(safe_name "${label}")"
   local dir="${out}/${safe_label}"
   printf '%s\t%s\t%s\t%s\t%s\n' "${label}" "${selection}" "${proton}" "${piminus}" "${dir}" >> "${manifest}"
-  root -l -b -q "analysis/plot_kinematic_coverage.cxx+(\"${input}\",\"${dir}\",\"${groups}\",\"${stem}_${safe_label}\",\"${pairs}\",\"${selection}\",\"${flux}\",${emin},${emax},${proton},${piminus})"
+  root -l -b -q "analysis/plot_kinematic_coverage.cxx+(\"${input}\",\"${dir}\",\"${groups}\",\"${stem}_${safe_label}\",\"${pairs}\",\"${selection}\",${proton},${piminus})"
 }
 
 case "${assumptions}" in

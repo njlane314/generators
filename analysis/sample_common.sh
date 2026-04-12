@@ -98,20 +98,6 @@ ana_flux_dat() {
   esac
 }
 
-ana_nuwro_beam_energy() {
-  awk -v min_gev="$1" -v max_gev="$2" -v bin_width_gev="$3" '
-    BEGIN {
-      emin = min_gev * 1000.0
-      emax = max_gev * 1000.0
-      step = bin_width_gev * 1000.0
-      if (step <= 0 || emax <= emin) exit 1
-      n = int(((emax - emin) / step) + 0.5)
-      printf "%.12g %.12g", emin, emax
-      for (i = 0; i < n; ++i) printf " 1"
-      printf "\n"
-    }'
-}
-
 ana_nuwro_beam_energy_from_flux() {
   awk -v min_gev="$2" -v max_gev="$3" -v bin_width_gev="$4" '
     BEGIN {
@@ -135,19 +121,6 @@ ana_nuwro_beam_energy_from_flux() {
       }
       printf "\n"
     }' "$1"
-}
-
-ana_write_flat_flux_dat() {
-  mkdir -p "$(dirname "$1")"
-  awk -v min_gev="$2" -v max_gev="$3" -v bin_width_gev="$4" '
-    BEGIN {
-      print "# energy_GeV flat_weight"
-      n = int(((max_gev - min_gev) / bin_width_gev) + 0.5)
-      for (i = 0; i < n; ++i) {
-        e = min_gev + (i + 0.5) * bin_width_gev
-        printf "%.7f 1.000000000000e+00\n", e
-      }
-    }' > "$1"
 }
 
 ana_write_flux_dat_window() {

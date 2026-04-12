@@ -1,9 +1,6 @@
-#include <TDirectory.h>
 #include <TFile.h>
 #include <TH1.h>
-#include <TKey.h>
 #include <TLeaf.h>
-#include <TObject.h>
 #include <TString.h>
 #include <TSystem.h>
 #include <TTree.h>
@@ -72,18 +69,6 @@ struct YieldRow {
     TString category;
     TString definition;
     YieldAcc acc;
-};
-
-struct FluxEnv {
-    bool initialized = false;
-    bool active = false;
-    double emin = 0.0;
-    double emax = 0.0;
-    double proposal_emin = 0.0;
-    double proposal_emax = 10.0;
-    double mean_bin_flux = 1.0;
-    TString source;
-    std::vector<TH1*> hists;
 };
 
 struct TreeInputs {
@@ -545,203 +530,9 @@ TString infer_beam_species(TString text)
     return "";
 }
 
-TString flux_hist_path(const TString& beam_mode, const TString& beam_species)
+bool in_energy_window(double enu, double energy_min, double energy_max)
 {
-    TString path = beam_mode;
-    path += "/";
-    path += beam_species;
-    path += "/Detsmear/";
-    path += (beam_species == "numubar" ? "numubar_CV_AV_TPC_5MeV_bin" : "numu_CV_AV_TPC_5MeV_bin");
-    return path;
-}
-
-TString hist_leaf_name(TString path)
-{
-    const Ssiz_t slash = path.Last('/');
-    return slash < 0 ? path : path(slash + 1, path.Length() - slash - 1);
-}
-
-std::vector<TString> flux_hist_paths(TString beam_mode, TString beam_species)
-{
-    beam_mode = normalize_beam_mode(beam_mode);
-    beam_species = normalize_beam_species(beam_species);
-    std::vector<TString> paths;
-    auto add = [&](const TString& mode, const TString& species) {
-        paths.push_back(flux_hist_path(mode, species));
-    };
-    if (beam_mode == "combined") {
-        if (beam_species == "") {
-            add("fhc", "numu");
-            add("fhc", "numubar");
-            add("rhc", "numu");
-            add("rhc", "numubar");
-        } else {
-            add("fhc", beam_species);
-            add("rhc", beam_species);
-        }
-    } else if (beam_mode == "fhc" || beam_mode == "rhc") {
-        add(beam_mode, beam_species == "" ? TString(beam_mode == "rhc" ? "numubar" : "numu") : beam_species);
-    }
-    return paths;
-}
-
-TH1* find_hist(TDirectory* dir, const TString& name)
-{
-    if (!dir) return nullptr;
-    if (TH1* direct = dynamic_cast<TH1*>(dir->Get(name))) return direct;
-    TIter next(dir->GetListOfKeys());
-    while (TKey* key = static_cast<TKey*>(next())) {
-        TObject* obj = key->ReadObj();
-        if (!obj) continue;
-        if (obj->InheritsFrom(TH1::Class()) && name == obj->GetName()) return static_cast<TH1*>(obj);
-        if (obj->InheritsFrom(TDirectory::Class())) {
-            if (TH1* found = find_hist(static_cast<TDirectory*>(obj), name)) return found;
-        }
-    }
-    return nullptr;
-}
-
-TH1* find_flux_hist(TFile* file, const TString& path)
-{
-    TH1* hist = dynamic_cast<TH1*>(file->Get(path));
-    return hist ? hist : find_hist(file, hist_leaf_name(path));
-}
-
-bool extend_flux(TH1* hist, double floor_fraction, FluxEnv& env)
-{
-    if (!hist || hist->GetMaximum() <= 0.0) return false;
-    const double floor = std::max(0.0, floor_fraction) * hist->GetMaximum();
-    bool found = false;
-    double emin = 0.0;
-    double emax = 0.0;
-    for (int bin = 1; bin <= hist->GetNbinsX(); ++bin) {
-        if (hist->GetBinContent(bin) <= floor) continue;
-        const double low = hist->GetXaxis()->GetBinLowEdge(bin);
-        const double high = hist->GetXaxis()->GetBinUpEdge(bin);
-        emin = found ? std::min(emin, low) : low;
-        emax = found ? std::max(emax, high) : high;
-        found = true;
-    }
-    if (!found) return false;
-    TH1* clone = static_cast<TH1*>(hist->Clone(TString::Format("%s_expected_yield_flux_%d", hist->GetName(), int(env.hists.size()))));
-    clone->SetDirectory(nullptr);
-    env.hists.push_back(clone);
-    env.emin = env.active ? std::min(env.emin, emin) : emin;
-    env.emax = env.active ? std::max(env.emax, emax) : emax;
-    env.active = true;
-    return true;
-}
-
-double mean_flux_in_proposal(const FluxEnv& env)
-{
-    double total = 0.0;
-    int bins = 0;
-    for (TH1* hist : env.hists) {
-        for (int bin = 1; bin <= hist->GetNbinsX(); ++bin) {
-            const double center = hist->GetXaxis()->GetBinCenter(bin);
-            if (center < env.proposal_emin || center >= env.proposal_emax) continue;
-            total += std::max(0.0, hist->GetBinContent(bin));
-            ++bins;
-        }
-    }
-    return bins > 0 && !env.hists.empty() ? total / (double(bins) / double(env.hists.size())) : 0.0;
-}
-
-FluxEnv read_flux(TString path, TString beam_mode, TString beam_species, double floor_fraction,
-                  double proposal_emin, double proposal_emax)
-{
-    FluxEnv env;
-    env.initialized = true;
-    env.proposal_emin = proposal_emin;
-    env.proposal_emax = proposal_emax;
-
-    if (path == "") {
-        env.active = false;
-        env.source = "no_flux_reweight";
-        return env;
-    }
-
-    beam_mode = normalize_beam_mode(beam_mode);
-    if (beam_mode == "") {
-        std::cerr << "Beam mode must be FHC, RHC, or combined." << std::endl;
-        return env;
-    }
-
-    TFile* file = TFile::Open(path, "READ");
-    if (!file || file->IsZombie()) {
-        std::cerr << "Could not open NuMI flux file: " << path.Data() << std::endl;
-        if (file) file->Close();
-        return env;
-    }
-
-    std::vector<TString> used;
-    const std::vector<TString> names = flux_hist_paths(beam_mode, beam_species);
-    for (const TString& name : names) {
-        if (extend_flux(find_flux_hist(file, name), floor_fraction, env)) used.push_back(name);
-        else std::cerr << "Could not use NuMI flux histogram: " << name.Data() << std::endl;
-    }
-    file->Close();
-    delete file;
-
-    if (!env.active || env.emax <= env.emin) {
-        env.active = false;
-        std::cerr << "No valid non-zero NuMI flux support was found in " << path.Data() << std::endl;
-        return env;
-    }
-    env.emin = std::max(env.emin, env.proposal_emin);
-    env.emax = std::min(env.emax, env.proposal_emax);
-    env.mean_bin_flux = mean_flux_in_proposal(env);
-    if (env.emax <= env.emin || env.mean_bin_flux <= 0.0) {
-        env.active = false;
-        std::cerr << "No valid NuMI flux overlap with flat proposal range "
-                  << env.proposal_emin << " to " << env.proposal_emax << " GeV." << std::endl;
-        return env;
-    }
-
-    env.source = path;
-    env.source += " [";
-    for (int i = 0; i < int(used.size()); ++i) {
-        if (i) env.source += ", ";
-        env.source += used[i];
-    }
-    env.source += "]";
-    return env;
-}
-
-double flux_reweight(const FluxEnv& env, double enu)
-{
-    if (!env.initialized || !env.active) return 1.0;
-    if (enu < env.emin || enu >= env.emax || env.mean_bin_flux <= 0.0) return 0.0;
-    double flux = 0.0;
-    for (TH1* hist : env.hists) {
-        const int bin = hist->FindBin(enu);
-        if (bin < 1 || bin > hist->GetNbinsX()) continue;
-        flux += std::max(0.0, hist->GetBinContent(bin));
-    }
-    return flux / env.mean_bin_flux;
-}
-
-void clear_flux_cache(std::map<std::string, FluxEnv>& cache)
-{
-    for (auto& item : cache) {
-        for (TH1* hist : item.second.hists) delete hist;
-        item.second.hists.clear();
-    }
-    cache.clear();
-}
-
-FluxEnv& flux_for_row(const StatusRow& row, const TString& flux_file, double floor_fraction,
-                      double proposal_emin, double proposal_emax,
-                      std::map<std::string, FluxEnv>& cache)
-{
-    TString beam_mode = normalize_beam_mode(row.beam_mode);
-    TString beam_species = normalize_beam_species(row.beam_species);
-    if (beam_mode == "") beam_mode = infer_beam_mode(row.input_file + " " + row.sample);
-    if (beam_species == "") beam_species = infer_beam_species(row.input_file + " " + row.sample);
-    const std::string key = std::string(flux_file.Data()) + "|" + beam_mode.Data() + "|" + beam_species.Data();
-    FluxEnv& env = cache[key];
-    if (!env.initialized) env = read_flux(flux_file, beam_mode, beam_species, floor_fraction, proposal_emin, proposal_emax);
-    return env;
+    return enu >= energy_min && enu < energy_max;
 }
 
 TreeInputs bind_inputs(TTree* tree)
@@ -776,10 +567,10 @@ double xsec_weight_1e38_per_Ar(const TreeInputs& in, double analysis_weight)
     return analysis_weight * target_a * units;
 }
 
-bool scan_file(const StatusRow& row, const TString& flux_file, double flux_floor_fraction,
-               double proposal_emin, double proposal_emax, double exposure_scale,
+bool scan_file(const StatusRow& row, double exposure_scale,
                double proton_threshold, double piminus_threshold,
-               std::map<std::string, FluxEnv>& flux_cache, std::vector<YieldRow>& out)
+               double energy_min, double energy_max,
+               std::vector<YieldRow>& out)
 {
     TFile* file = TFile::Open(row.input_file, "READ");
     if (!file || file->IsZombie()) {
@@ -798,9 +589,9 @@ bool scan_file(const StatusRow& row, const TString& flux_file, double flux_floor
     }
 
     TreeInputs in = bind_inputs(tree);
-    if (!in.enu && flux_file != "") {
+    if (!in.enu) {
         std::cerr << "Missing Enu_true/enu_true in " << row.input_file.Data()
-                  << "; cannot apply NuMI flux reweighting." << std::endl;
+                  << "; cannot apply the analysis energy window." << std::endl;
         file->Close();
         delete file;
         return false;
@@ -824,23 +615,14 @@ bool scan_file(const StatusRow& row, const TString& flux_file, double flux_floor
         local.push_back(yield);
     }
 
-    FluxEnv& flux = flux_for_row(row, flux_file, flux_floor_fraction, proposal_emin, proposal_emax, flux_cache);
-    if (flux_file != "" && !flux.active) {
-        std::cerr << "Skipping " << row.input_file.Data() << " because NuMI flux reweighting is inactive." << std::endl;
-        file->Close();
-        delete file;
-        return false;
-    }
-
     const Long64_t entries = tree->GetEntries();
     for (Long64_t entry = 0; entry < entries; ++entry) {
         tree->GetEntry(entry);
-        const double flux_weight = in.enu ? flux_reweight(flux, value(in.enu)) : 1.0;
-        if (!std::isfinite(flux_weight) || flux_weight <= 0.0) continue;
+        if (!in_energy_window(value(in.enu), energy_min, energy_max)) continue;
 
         const double base_weight = base_analysis_weight(in);
-        const double expected_weight = base_weight * flux_weight * exposure_scale;
-        const double xsec_weight = xsec_weight_1e38_per_Ar(in, base_weight) * flux_weight;
+        const double expected_weight = base_weight * exposure_scale;
+        const double xsec_weight = xsec_weight_1e38_per_Ar(in, base_weight);
         if (!std::isfinite(expected_weight) || !std::isfinite(xsec_weight)) continue;
 
         const EventSummary summary = summarize_event(in, proton_threshold, piminus_threshold);
@@ -1199,8 +981,8 @@ void write_generator_envelope_rows(const TString& path, const std::vector<YieldR
     }
 }
 
-void write_summary_md(const TString& path, const TString& status_csv, const TString& flux_file,
-                      double proposal_emin, double proposal_emax, double exposure_scale,
+void write_summary_md(const TString& path, const TString& status_csv,
+                      double energy_min, double energy_max, double exposure_scale,
                       double proton_threshold, double piminus_threshold,
                       int samples_processed, int rows_written)
 {
@@ -1209,8 +991,7 @@ void write_summary_md(const TString& path, const TString& status_csv, const TStr
     out << "Expected event yields\n"
         << "=====================\n\n"
         << "Input status CSV: `" << status_csv.Data() << "`\n\n"
-        << "NuMI flux file: `" << (flux_file == "" ? TString("none") : flux_file).Data() << "`\n\n"
-        << "Flat proposal range: " << proposal_emin << " to " << proposal_emax << " GeV\n\n"
+        << "Analysis energy window: " << energy_min << " to " << energy_max << " GeV\n\n"
         << "Exposure scale applied to `expected_events`: " << exposure_scale << "\n\n"
         << "Fast detector-envelope Lambda -> p pi- branching ratio: "
         << lambda_to_p_piminus_br << "\n\n"
@@ -1219,7 +1000,7 @@ void write_summary_md(const TString& path, const TString& status_csv, const TStr
         << "Samples processed: " << samples_processed << "\n\n"
         << "Per-variation rows written: " << rows_written << "\n\n"
         << "Definitions:\n\n"
-        << "* `expected_events` is `analysis_weight * normalized_NuMI_flux_weight * exposure_scale`.\n"
+        << "* `expected_events` is `analysis_weight * exposure_scale`.\n"
         << "  With the default exposure scale of 1, this is a unit-normalized analysis yield;\n"
         << "  pass an exposure/POT/target scale if absolute detector event counts are needed.\n"
         << "* `xsec_weighted_1e38_cm2_per_Ar` uses an existing xsec-weight branch when present;\n"
@@ -1250,13 +1031,11 @@ void write_summary_md(const TString& path, const TString& status_csv, const TStr
 void expected_event_yields(
     TString status_csv = "analysis/output/matrix/generator_matrix_status.csv",
     TString output_dir = "analysis/output/expected_event_yields",
-    TString flux_file = "analysis/flux/microboone_numi_flux_5mev.root",
-    double flux_floor_fraction = 0.0,
-    double proposal_emin_gev = 0.0,
-    double proposal_emax_gev = 10.0,
     double exposure_scale = 1.0,
     double proton_threshold_gev = 0.30,
-    double piminus_threshold_gev = 0.07
+    double piminus_threshold_gev = 0.07,
+    double energy_min_gev = 0.0,
+    double energy_max_gev = 10.0
 )
 {
     using namespace AnaExpectedYields;
@@ -1269,19 +1048,16 @@ void expected_event_yields(
 
     gSystem->mkdir(output_dir.Data(), true);
     std::vector<YieldRow> yields;
-    std::map<std::string, FluxEnv> flux_cache;
     int samples_processed = 0;
     for (const StatusRow& row : rows) {
-        if (scan_file(row, flux_file, flux_floor_fraction, proposal_emin_gev,
-                      proposal_emax_gev, exposure_scale, proton_threshold_gev,
-                      piminus_threshold_gev, flux_cache, yields)) {
+        if (scan_file(row, exposure_scale, proton_threshold_gev, piminus_threshold_gev,
+                      energy_min_gev, energy_max_gev, yields)) {
             ++samples_processed;
         }
     }
 
     if (yields.empty()) {
         std::cerr << "No yield rows were produced." << std::endl;
-        clear_flux_cache(flux_cache);
         return;
     }
 
@@ -1314,7 +1090,7 @@ void expected_event_yields(
                                   proton_threshold_gev, piminus_threshold_gev);
     write_generator_envelope_rows(generator_envelope_csv, yields, false, exposure_scale,
                                   proton_threshold_gev, piminus_threshold_gev);
-    write_summary_md(summary_md, status_csv, flux_file, proposal_emin_gev, proposal_emax_gev,
+    write_summary_md(summary_md, status_csv, energy_min_gev, energy_max_gev,
                      exposure_scale, proton_threshold_gev, piminus_threshold_gev,
                      samples_processed, int(yields.size()));
 
@@ -1326,5 +1102,4 @@ void expected_event_yields(
               << "\nAll-variation generator envelope: " << generator_envelope_csv.Data()
               << "\nNotes: " << summary_md.Data() << std::endl;
 
-    clear_flux_cache(flux_cache);
 }

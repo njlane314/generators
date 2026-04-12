@@ -295,10 +295,8 @@ void run_primary_mechanism(
     const expanded_row& row,
     const TString& output_dir,
     const TString& working_point,
-    const TString& flux_file,
-    double flux_floor_fraction,
-    double proposal_emin_gev,
-    double proposal_emax_gev,
+    double energy_min_gev,
+    double energy_max_gev,
     bool& loaded
 )
 {
@@ -311,10 +309,8 @@ void run_primary_mechanism(
     cmd += root_quote(row.generator) + ",";
     cmd += root_quote(row.variation) + ",";
     cmd += root_quote(working_point) + ",";
-    cmd += root_quote(flux_file) + ",";
-    cmd += TString::Format("%.17g,", flux_floor_fraction);
     cmd += root_quote(beam_polarity) + ",";
-    cmd += TString::Format("%.17g,%.17g,", proposal_emin_gev, proposal_emax_gev);
+    cmd += TString::Format("%.17g,%.17g,", energy_min_gev, energy_max_gev);
     cmd += root_quote(row.beam_species) + ")";
     gROOT->ProcessLine(cmd);
 }
@@ -322,10 +318,8 @@ void run_primary_mechanism(
 void run_nuclear_exit(
     const expanded_row& row,
     const TString& output_dir,
-    const TString& flux_file,
-    double flux_floor_fraction,
-    double proposal_emin_gev,
-    double proposal_emax_gev,
+    double energy_min_gev,
+    double energy_max_gev,
     bool& loaded
 )
 {
@@ -337,10 +331,8 @@ void run_nuclear_exit(
     cmd += root_quote(row.sample_label) + ",";
     cmd += root_quote(row.generator) + ",";
     cmd += root_quote(row.variation) + ",";
-    cmd += root_quote(flux_file) + ",";
-    cmd += TString::Format("%.17g,", flux_floor_fraction);
     cmd += root_quote(beam_polarity) + ",";
-    cmd += TString::Format("%.17g,%.17g,", proposal_emin_gev, proposal_emax_gev);
+    cmd += TString::Format("%.17g,%.17g,", energy_min_gev, energy_max_gev);
     cmd += root_quote(row.beam_species) + ")";
     gROOT->ProcessLine(cmd);
 }
@@ -351,10 +343,8 @@ void run_generator_matrix(
     TString plan_file = "analysis/config/generator_loop_plan.tsv",
     TString output_dir = "analysis/output/matrix",
     TString working_point = "nominal",
-    TString flux_file = "analysis/flux/microboone_numi_flux_5mev.root",
-    double flux_floor_fraction = 0.0,
-    double proposal_emin_gev = 0.0,
-    double proposal_emax_gev = 10.0
+    double energy_min_gev = 0.0,
+    double energy_max_gev = 10.0
 )
 {
     const std::vector<plan_row> plan = read_plan(plan_file);
@@ -393,8 +383,8 @@ void run_generator_matrix(
             ++missing;
         } else {
             if (truthy(row.run_primary)) {
-                run_primary_mechanism(row, output_dir, working_point, flux_file, flux_floor_fraction,
-                                      proposal_emin_gev, proposal_emax_gev, primary_loaded);
+                run_primary_mechanism(row, output_dir, working_point, energy_min_gev, energy_max_gev,
+                                      primary_loaded);
                 primary_status = "ran";
                 ++primary_run;
             }
@@ -404,8 +394,7 @@ void run_generator_matrix(
             const bool exit_requested = exit_auto || truthy(run_exit);
             if (exit_requested) {
                 if (has_exit_branches(row.input_file)) {
-                    run_nuclear_exit(row, output_dir, flux_file, flux_floor_fraction,
-                                     proposal_emin_gev, proposal_emax_gev, nuclear_loaded);
+                    run_nuclear_exit(row, output_dir, energy_min_gev, energy_max_gev, nuclear_loaded);
                     exit_status = "ran";
                     ++exit_run;
                 } else {

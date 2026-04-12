@@ -17,7 +17,6 @@
 
 namespace AnaGeneratorEnvelope {
 
-using AnaBeamEnvelope::FluxEnv;
 using AnaBeamEnvelope::StatusRow;
 using AnaBeamEnvelope::VariableSpec;
 
@@ -174,10 +173,6 @@ void generator_kinematic_envelope(
     TString output_dir = "analysis/output/generator_kinematic_envelope",
     TString variables = "enu q2 w hyperon_p",
     TString selection = "detector_visible_lambda",
-    TString flux_file = "analysis/flux/microboone_numi_flux_5mev.root",
-    double flux_floor_fraction = 0.0,
-    double proposal_emin_gev = 0.0,
-    double proposal_emax_gev = 10.0,
     double proton_threshold_gev = 0.30,
     double piminus_threshold_gev = 0.07,
     bool include_fsi_state_in_group = false
@@ -197,7 +192,6 @@ void generator_kinematic_envelope(
     std::map<std::string, std::vector<StatusRow>> groups;
     for (const StatusRow& row : rows) groups[group_key(row, include_fsi_state_in_group).Data()].push_back(row);
 
-    std::map<std::string, FluxEnv> flux_cache;
     std::ofstream summary(AnaBeamEnvelope::join_path(output_dir, "generator_kinematic_envelope_summary.csv").Data());
     summary << "group,selection,variable,n_members,envelope_min_integral,envelope_max_integral,"
             << "plot_base,csv_file\n";
@@ -221,10 +215,8 @@ void generator_kinematic_envelope(
                                       hist_title, variable.bins, variable.min, variable.max);
                 hist->SetDirectory(nullptr);
                 hist->Sumw2();
-                AnaBeamEnvelope::fill_hist(row, hist, variable, selection, flux_file,
-                                           flux_floor_fraction, proposal_emin_gev,
-                                           proposal_emax_gev, proton_threshold_gev,
-                                           piminus_threshold_gev, flux_cache);
+                AnaBeamEnvelope::fill_hist(row, hist, variable, selection,
+                                           proton_threshold_gev, piminus_threshold_gev);
                 if (hist->Integral() > 0.0) {
                     hists.push_back(hist);
                     labels.push_back(row_label(row, include_fsi_state_in_group));
@@ -266,7 +258,6 @@ void generator_kinematic_envelope(
         }
     }
 
-    AnaBeamEnvelope::clear_flux_cache(flux_cache);
     std::cout << "Wrote " << outputs << " generator kinematic envelope outputs under "
               << output_dir.Data() << std::endl;
 }

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -gt 11 ]]; then
+if [[ $# -gt 8 ]]; then
   cat >&2 <<'EOF'
-Usage: analysis/run_kinematic_coverage.sh [INPUT_SOURCE] [OUTPUT_DIR] [LABELS_OR_GROUPINGS] [OUTPUT_STEM] [PAIRS] [SELECTION] [FLUX_FILE] [PROPOSAL_EMIN] [PROPOSAL_EMAX] [PROTON_THRESHOLD] [PIMINUS_THRESHOLD]
+Usage: analysis/run_kinematic_coverage.sh [INPUT_SOURCE] [OUTPUT_DIR] [LABELS_OR_GROUPINGS] [OUTPUT_STEM] [PAIRS] [SELECTION] [PROTON_THRESHOLD] [PIMINUS_THRESHOLD]
 
 INPUT_SOURCE defaults to analysis/output/matrix/generator_matrix_status.csv.
 For a status CSV, LABELS_OR_GROUPINGS is a space/comma list from: variation beam generator all.
@@ -19,10 +19,7 @@ labels_or_groupings="${3:-variation beam generator}"
 output_stem="${4:-coverage}"
 pairs="${5:-enu_q2 enu_w q2_w enu_lambda_p w_lambda_p lambda_p_costheta}"
 selection="${6:-final_hyperon}"
-flux_file="${7-analysis/flux/microboone_numi_flux_5mev.root}"
-proposal_emin="${8:-0.0}"
-proposal_emax="${9:-10.0}"
-proton_threshold="${10:-0.30}"
-piminus_threshold="${11:-0.07}"
+proton_threshold="${7:-0.30}"
+piminus_threshold="${8:-0.07}"
 
-root -l -b -q "analysis/plot_kinematic_coverage.cxx+(\"${input_source}\",\"${output_dir}\",\"${labels_or_groupings}\",\"${output_stem}\",\"${pairs}\",\"${selection}\",\"${flux_file}\",${proposal_emin},${proposal_emax},${proton_threshold},${piminus_threshold})"
+root -l -b -q "analysis/plot_kinematic_coverage.cxx+(\"${input_source}\",\"${output_dir}\",\"${labels_or_groupings}\",\"${output_stem}\",\"${pairs}\",\"${selection}\",${proton_threshold},${piminus_threshold})"

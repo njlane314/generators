@@ -238,12 +238,13 @@ Freeze the MicroBooNE NuMI flux inputs first.  Use:
 
   * updated MicroBooNE NuMI FHC flux histogram;
   * updated MicroBooNE NuMI RHC flux histogram;
-  * a flat-in-E generation configuration plus beam reweighting to FHC/RHC.
+  * direct FHC/RHC NuMI beam generation configurations.
 
 Reason: rare strange channels are too expensive to generate directly with
-beam-thrown spectra if the only goal is phase-space coverage and topology
-fractions.  Flat-in-E generation with later flux weighting is more
-efficient and separates production from beam shape.
+overly narrow exact-count rejection loops if the only goal is phase-space
+coverage and topology fractions.  Generate with the beam spectra used for the
+analysis, keep the selected count floating, and carry the statistical
+uncertainty.
 
 Layer 1: mechanism-control samples
 ----------------------------------

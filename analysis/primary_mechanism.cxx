@@ -1,13 +1,10 @@
 #include <TAxis.h>
-#include <TDirectory.h>
 #include <TFile.h>
 #include <TH1.h>
 #include <TH1D.h>
 #include <TH2D.h>
-#include <TKey.h>
 #include <TLeaf.h>
 #include <TNamed.h>
-#include <TObject.h>
 #include <TString.h>
 #include <TSystem.h>
 #include <TTree.h>
@@ -54,17 +51,6 @@ struct topology {
     TLeaf* pion = nullptr;
     TLeaf* detached = nullptr;
     TString source = "flat-tree final Lambda + visible p pi- proxy";
-};
-
-struct flux_envelope {
-    bool active = false;
-    double emin = 0.0;
-    double emax = 0.0;
-    double proposal_emin = 0.0;
-    double proposal_emax = 10.0;
-    double mean_bin_flux = 1.0;
-    TString source;
-    std::vector<TH1*> hists;
 };
 
 struct primary_counts {
@@ -190,45 +176,6 @@ TString normalize_beam_species(TString beam_species)
     if (beam_species == "numu" || beam_species == "nu_mu" || beam_species == "14") return "numu";
     if (beam_species == "numubar" || beam_species == "anti_numu" || beam_species == "-14") return "numubar";
     return beam_species;
-}
-
-TString flux_hist_path(const TString& beam_polarity, const TString& beam_species)
-{
-    TString path = beam_polarity;
-    path += "/";
-    path += beam_species;
-    path += "/Detsmear/";
-    path += (beam_species == "numubar" ? "numubar_CV_AV_TPC_5MeV_bin" : "numu_CV_AV_TPC_5MeV_bin");
-    return path;
-}
-
-TString hist_leaf_name(TString path)
-{
-    const Ssiz_t slash = path.Last('/');
-    return slash < 0 ? path : path(slash + 1, path.Length() - slash - 1);
-}
-
-std::vector<TString> flux_hist_paths(const TString& beam_polarity, TString beam_species)
-{
-    beam_species = normalize_beam_species(beam_species);
-    std::vector<TString> paths;
-    auto add = [&](const TString& polarity, const TString& species) {
-        paths.push_back(flux_hist_path(polarity, species));
-    };
-    if (beam_polarity == "combined") {
-        if (beam_species == "") {
-            add("fhc", "numu");
-            add("fhc", "numubar");
-            add("rhc", "numu");
-            add("rhc", "numubar");
-        } else {
-            add("fhc", beam_species);
-            add("rhc", beam_species);
-        }
-    } else if (beam_polarity == "fhc" || beam_polarity == "rhc") {
-        add(beam_polarity, beam_species == "" ? TString(beam_polarity == "rhc" ? "numubar" : "numu") : beam_species);
-    }
-    return paths;
 }
 
 TString infer_generator(TString sample)
@@ -363,140 +310,9 @@ int mode_bin(int mode, bool has_mode)
     return 6;
 }
 
-TH1* find_hist(TDirectory* dir, const TString& name)
+bool in_energy_window(double enu, double energy_min, double energy_max)
 {
-    if (!dir) return nullptr;
-    TIter next(dir->GetListOfKeys());
-    while (TKey* key = static_cast<TKey*>(next())) {
-        TObject* obj = key->ReadObj();
-        if (!obj) continue;
-        if (obj->InheritsFrom(TH1::Class()) && name == obj->GetName()) return static_cast<TH1*>(obj);
-        if (obj->InheritsFrom(TDirectory::Class())) {
-            if (TH1* found = find_hist(static_cast<TDirectory*>(obj), name)) return found;
-        }
-    }
-    return nullptr;
-}
-
-TH1* find_flux_hist(TFile* file, const TString& path)
-{
-    TH1* hist = dynamic_cast<TH1*>(file->Get(path));
-    return hist ? hist : find_hist(file, hist_leaf_name(path));
-}
-
-bool extend_flux(TH1* hist, double floor_fraction, flux_envelope& env)
-{
-    if (!hist || hist->GetMaximum() <= 0.0) return false;
-    const double floor = std::max(0.0, floor_fraction) * hist->GetMaximum();
-    bool found = false;
-    double emin = 0.0;
-    double emax = 0.0;
-    for (int bin = 1; bin <= hist->GetNbinsX(); ++bin) {
-        if (hist->GetBinContent(bin) <= floor) continue;
-        const double low = hist->GetXaxis()->GetBinLowEdge(bin);
-        const double high = hist->GetXaxis()->GetBinUpEdge(bin);
-        emin = found ? std::min(emin, low) : low;
-        emax = found ? std::max(emax, high) : high;
-        found = true;
-    }
-    if (!found) return false;
-    TH1* clone = static_cast<TH1*>(hist->Clone(TString::Format("%s_flat_proposal_reweight_%d", hist->GetName(), int(env.hists.size()))));
-    clone->SetDirectory(nullptr);
-    env.hists.push_back(clone);
-    env.emin = env.active ? std::min(env.emin, emin) : emin;
-    env.emax = env.active ? std::max(env.emax, emax) : emax;
-    env.active = true;
-    return true;
-}
-
-double mean_flux_in_proposal(const flux_envelope& env)
-{
-    double total = 0.0;
-    int bins = 0;
-    for (TH1* hist : env.hists) {
-        for (int bin = 1; bin <= hist->GetNbinsX(); ++bin) {
-            const double center = hist->GetXaxis()->GetBinCenter(bin);
-            if (center < env.proposal_emin || center >= env.proposal_emax) continue;
-            total += std::max(0.0, hist->GetBinContent(bin));
-            ++bins;
-        }
-    }
-    return bins > 0 && !env.hists.empty() ? total / (double(bins) / double(env.hists.size())) : 0.0;
-}
-
-flux_envelope read_flux(TString path, TString beam_polarity, TString beam_species, double floor_fraction,
-                        double proposal_emin, double proposal_emax)
-{
-    flux_envelope env;
-    env.proposal_emin = proposal_emin;
-    env.proposal_emax = proposal_emax;
-    if (path == "") {
-        env.active = true;
-        env.emin = proposal_emin;
-        env.emax = proposal_emax;
-        env.mean_bin_flux = 1.0;
-        env.source = "no_flux_reweight";
-        return env;
-    }
-    beam_polarity = normalize_beam_polarity(beam_polarity);
-    if (beam_polarity == "") {
-        std::cerr << "Beam polarity must be FHC, RHC, or combined." << std::endl;
-        return env;
-    }
-    TFile* file = TFile::Open(path, "READ");
-    if (!file || file->IsZombie()) {
-        std::cerr << "Could not open NuMI flux file: " << path.Data() << std::endl;
-        return env;
-    }
-    std::vector<TString> used;
-    const std::vector<TString> names = flux_hist_paths(beam_polarity, beam_species);
-    for (const TString& name : names) {
-        if (extend_flux(find_flux_hist(file, name), floor_fraction, env)) used.push_back(name);
-        else std::cerr << "Could not use NuMI flux histogram: " << name.Data() << std::endl;
-    }
-    file->Close();
-    if (!env.active || env.emax <= env.emin) {
-        env.active = false;
-        std::cerr << "No valid non-zero NuMI flux support was found in " << path.Data() << std::endl;
-        return env;
-    }
-    env.emin = std::max(env.emin, env.proposal_emin);
-    env.emax = std::min(env.emax, env.proposal_emax);
-    env.mean_bin_flux = mean_flux_in_proposal(env);
-    if (env.emax <= env.emin || env.mean_bin_flux <= 0.0) {
-        env.active = false;
-        std::cerr << "No valid NuMI flux overlap with flat proposal range "
-                  << env.proposal_emin << " to " << env.proposal_emax << " GeV." << std::endl;
-        return env;
-    }
-    env.source = path;
-    env.source += " [";
-    env.source += beam_polarity;
-    env.source += ": ";
-    for (int i = 0; i < int(used.size()); ++i) {
-        if (i) env.source += ", ";
-        env.source += used[i];
-    }
-    env.source += "]";
-    return env;
-}
-
-bool in_flux(const flux_envelope& env, double enu)
-{
-    return env.active && enu >= env.emin && enu <= env.emax;
-}
-
-double flux_reweight(const flux_envelope& env, double enu)
-{
-    if (!in_flux(env, enu) || env.mean_bin_flux <= 0.0) return 0.0;
-    if (env.hists.empty()) return 1.0;
-    double flux = 0.0;
-    for (TH1* hist : env.hists) {
-        const int bin = hist->FindBin(enu);
-        if (bin < 1 || bin > hist->GetNbinsX()) continue;
-        flux += std::max(0.0, hist->GetBinContent(bin));
-    }
-    return flux / env.mean_bin_flux;
+    return enu >= energy_min && enu < energy_max;
 }
 
 topology find_topology(TTree* tree, TString wp)
@@ -576,7 +392,7 @@ void write_summary(
     out << std::setprecision(12);
     write_row(
         out, sample, gen, knob, beam_polarity, "total", "selected_topology",
-        selected, selected.weight, "inclusive fiducial Lambda topology inside the NuMI flux envelope"
+        selected, selected.weight, "inclusive fiducial Lambda topology inside the analysis energy window"
     );
 
     const auto o_labels = origin_labels();
@@ -661,11 +477,9 @@ void primary_mechanism(
     TString generator = "",
     TString knob = "",
     TString working_point = "nominal",
-    TString flux_file = "analysis/flux/microboone_numi_flux_5mev.root",
-    double flux_floor_fraction = 0.0,
     TString beam_polarity = "combined",
-    double proposal_emin_gev = 0.0,
-    double proposal_emax_gev = 10.0,
+    double energy_min_gev = 0.0,
+    double energy_max_gev = 10.0,
     TString beam_species = ""
 )
 {
@@ -702,10 +516,9 @@ void primary_mechanism(
     }
 
     beam_species = normalize_beam_species(beam_species);
-    const flux_envelope flux = read_flux(flux_file, beam_polarity, beam_species, flux_floor_fraction,
-                                         proposal_emin_gev, proposal_emax_gev);
-    if (!flux.active) {
-        std::cerr << "Refusing to make primary-mechanism summaries without an active flux or energy window." << std::endl;
+    if (energy_max_gev <= energy_min_gev) {
+        std::cerr << "Invalid analysis energy window: " << energy_min_gev
+                  << " to " << energy_max_gev << " GeV." << std::endl;
         input->Close();
         return;
     }
@@ -738,7 +551,7 @@ void primary_mechanism(
 
     TH1D h_cutflow("topology_cutflow", ";selection;events [10^{-38} cm^{2}/target]", 10, 0.5, 10.5);
     label(h_cutflow.GetXaxis(), {
-        "numi_flux", "final_Lambda", "visible_p_pi", "flat_proxy", "selected_topology",
+        "energy_window", "final_Lambda", "visible_p_pi", "flat_proxy", "selected_topology",
         "S1_CC_muon", "S2_K", "S3_lowExtra", "S4_EM", "S5_noMuon"
     });
     TH1D h_origin("primary_origin", ";primary origin;events [10^{-38} cm^{2}/target]",
@@ -750,7 +563,7 @@ void primary_mechanism(
         ";primary strange species;particles [10^{-38} cm^{2}/target]",
         species.size(), -0.5, species.size() - 0.5);
     TH1D h_enu("enu_selected_topology", ";E_{#nu} [GeV];events / GeV [10^{-38} cm^{2}/target]",
-        80, flux.emin, flux.emax);
+        80, energy_min_gev, energy_max_gev);
     TH1D h_p_lambda("p_lambda_selected_topology",
                     ";p_{#Lambda} [GeV];events / GeV [10^{-38} cm^{2}/target]", 80, 0.0, 4.0);
     TH2D h_origin_mode("primary_origin_vs_interaction_mode", ";primary origin;interaction mode",
@@ -773,16 +586,16 @@ void primary_mechanism(
     std::vector<acc> origin_count(origins.size()), mode_count(modes.size()), category_count(categories.size());
     std::vector<std::vector<acc>> origin_mode(origins.size(), std::vector<acc>(modes.size()));
     std::map<int, acc> raw_mode;
-    Long64_t entries_in_flux = 0;
+    Long64_t entries_in_window = 0;
 
     const Long64_t entries = tree->GetEntries();
     for (Long64_t entry = 0; entry < entries; ++entry) {
         tree->GetEntry(entry);
         const double enu_gev = value(enu);
-        if (!in_flux(flux, enu_gev)) continue;
-        ++entries_in_flux;
+        if (!in_energy_window(enu_gev, energy_min_gev, energy_max_gev)) continue;
+        ++entries_in_window;
 
-        const double evt_w = value(weight, 0, 1.0) * value(scale, 0, 1.0) * flux_reweight(flux, enu_gev);
+        const double evt_w = value(weight, 0, 1.0) * value(scale, 0, 1.0);
         const double xsec_w = evt_w * std::max(1, int_value(target_a, 0, int(default_argon_a))) * units;
         h_cutflow.Fill(1, xsec_w);
 
@@ -905,18 +718,10 @@ void primary_mechanism(
     note += beam_polarity;
     note += "; beam_species=";
     note += beam_species == "" ? TString("default") : beam_species;
-    note += "; numi_flux_source=";
-    note += flux.source;
-    note += "; numi_flux_emin_GeV=";
-    note += TString::Format("%.8g", flux.emin);
-    note += "; numi_flux_emax_GeV=";
-    note += TString::Format("%.8g", flux.emax);
-    note += "; flat_proposal_emin_GeV=";
-    note += TString::Format("%.8g", flux.proposal_emin);
-    note += "; flat_proposal_emax_GeV=";
-    note += TString::Format("%.8g", flux.proposal_emax);
-    note += "; numi_flux_reweight_mean_bin_flux=";
-    note += TString::Format("%.8g", flux.mean_bin_flux);
+    note += "; analysis_energy_min_GeV=";
+    note += TString::Format("%.8g", energy_min_gev);
+    note += "; analysis_energy_max_GeV=";
+    note += TString::Format("%.8g", energy_max_gev);
     note += "; if reduced_topology=false this is not a true fiducial selection";
     TNamed(TString("selection_note"), note).Write();
     h_cutflow.Write();
@@ -937,9 +742,8 @@ void primary_mechanism(
         << "\nBeam polarity: " << beam_polarity.Data()
         << "\nInput: " << input_file.Data()
         << "\nEntries: " << entries
-        << "\nEntries inside NuMI flux envelope: " << entries_in_flux
-        << "\nNuMI flux envelope: " << flux.emin << " to " << flux.emax
-        << " GeV from " << flux.source.Data()
+        << "\nEntries inside analysis energy window: " << entries_in_window
+        << "\nAnalysis energy window: " << energy_min_gev << " to " << energy_max_gev << " GeV"
         << "\nTopology selection source: " << topo.source.Data()
         << "\nOutputs:\n  " << root_path.Data()
         << "\n  " << summary_path.Data()

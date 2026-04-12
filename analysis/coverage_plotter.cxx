@@ -1,11 +1,9 @@
 #include <TAxis.h>
 #include <TCanvas.h>
 #include <TColor.h>
-#include <TDirectory.h>
 #include <TFile.h>
 #include <TH1.h>
 #include <TH2D.h>
-#include <TKey.h>
 #include <TLeaf.h>
 #include <TLegend.h>
 #include <TLine.h>
@@ -77,16 +75,6 @@ struct InputSpec {
     TString interaction;
     TString fsi_state;
     TString sample;
-};
-
-struct FluxEnv {
-    bool initialized = false;
-    bool active = false;
-    double proposal_emin = 0.0;
-    double proposal_emax = 10.0;
-    double mean_bin_flux = 1.0;
-    TString source;
-    std::vector<TH1*> hists;
 };
 
 struct FourVector {
@@ -547,28 +535,6 @@ int coverage_color(size_t index)
     return colors[index % (sizeof(colors) / sizeof(colors[0]))];
 }
 
-TH1* find_hist(TDirectory* dir, const TString& name)
-{
-    if (!dir) return nullptr;
-    if (TH1* direct = dynamic_cast<TH1*>(dir->Get(name))) return direct;
-    TIter next(dir->GetListOfKeys());
-    while (TKey* key = static_cast<TKey*>(next())) {
-        TObject* obj = key->ReadObj();
-        if (!obj) continue;
-        if (obj->InheritsFrom(TH1::Class()) && name == obj->GetName()) return static_cast<TH1*>(obj);
-        if (obj->InheritsFrom(TDirectory::Class())) {
-            if (TH1* found = find_hist(static_cast<TDirectory*>(obj), name)) return found;
-        }
-    }
-    return nullptr;
-}
-
-TString hist_leaf_name(TString path)
-{
-    const Ssiz_t slash = path.Last('/');
-    return slash < 0 ? path : path(slash + 1, path.Length() - slash - 1);
-}
-
 TString normalize_beam_mode(TString beam_mode)
 {
     beam_mode.ToLower();
@@ -601,64 +567,6 @@ TString infer_beam_species(TString text)
     if (text.Contains("numubar") || text.Contains("anti_numu")) return "numubar";
     if (text.Contains("numu")) return "numu";
     return "";
-}
-
-TString flux_hist_path(const TString& beam_mode, const TString& beam_species)
-{
-    TString path = beam_mode;
-    path += "/";
-    path += beam_species;
-    path += "/Detsmear/";
-    path += (beam_species == "numubar" ? "numubar_CV_AV_TPC_5MeV_bin" : "numu_CV_AV_TPC_5MeV_bin");
-    return path;
-}
-
-std::vector<TString> flux_hist_paths(TString beam_mode, TString beam_species)
-{
-    beam_mode = normalize_beam_mode(beam_mode);
-    beam_species = normalize_beam_species(beam_species);
-    std::vector<TString> paths;
-    auto add = [&](const TString& mode, const TString& species) {
-        paths.push_back(flux_hist_path(mode, species));
-    };
-    if (beam_mode == "combined") {
-        if (beam_species == "") {
-            add("fhc", "numu");
-            add("fhc", "numubar");
-            add("rhc", "numu");
-            add("rhc", "numubar");
-        } else {
-            add("fhc", beam_species);
-            add("rhc", beam_species);
-        }
-    } else if (beam_mode == "fhc" || beam_mode == "rhc") {
-        add(beam_mode, beam_species == "" ? TString(beam_mode == "rhc" ? "numubar" : "numu") : beam_species);
-    }
-    return paths;
-}
-
-bool add_flux_hist(TH1* hist, FluxEnv& env)
-{
-    if (!hist || hist->GetMaximum() <= 0.0) return false;
-    TH1* clone = static_cast<TH1*>(hist->Clone(TString::Format("%s_coverage_flux_%d", hist->GetName(), int(env.hists.size()))));
-    clone->SetDirectory(nullptr);
-    env.hists.push_back(clone);
-    return true;
-}
-
-double mean_flux_in_proposal(const FluxEnv& env)
-{
-    double total = 0.0;
-    int bins = 0;
-    for (TH1* hist : env.hists) {
-        for (int bin = 1; bin <= hist->GetNbinsX(); ++bin) {
-            const double center = hist->GetXaxis()->GetBinCenter(bin);
-            if (center < env.proposal_emin || center >= env.proposal_emax) continue;
-            total += std::max(0.0, hist->GetBinContent(bin));
-            ++bins;
-        }
-    }
-    return bins > 0 && !env.hists.empty() ? total / (double(bins) / double(env.hists.size())) : 0.0;
 }
 
 double containment_threshold(TH2D* hist, double fraction)
@@ -735,13 +643,6 @@ public:
         gStyle->SetLegendFont(42);
     }
 
-    ~CoveragePlotter()
-    {
-        for (auto& item : flux_cache_) {
-            for (TH1* hist : item.second.hists) delete hist;
-        }
-    }
-
     void SetPairIds(TString pair_ids)
     {
         pairs_ = pair_specs_from_arg(pair_ids);
@@ -757,13 +658,6 @@ public:
     {
         proton_threshold_ = proton_threshold;
         piminus_threshold_ = piminus_threshold;
-    }
-
-    void SetFlux(TString flux_file, double proposal_emin, double proposal_emax)
-    {
-        flux_file_ = flux_file;
-        proposal_emin_ = proposal_emin;
-        proposal_emax_ = proposal_emax;
     }
 
     void DrawExplicitRootFiles(TString input_source, TString labels_arg, TString output_stem)
@@ -814,13 +708,9 @@ public:
 private:
     TString output_dir_;
     TString selection_ = "final_hyperon";
-    TString flux_file_ = "analysis/flux/microboone_numi_flux_5mev.root";
-    double proposal_emin_ = 0.0;
-    double proposal_emax_ = 10.0;
     double proton_threshold_ = 0.30;
     double piminus_threshold_ = 0.07;
     std::vector<PairSpec> pairs_ = pair_specs_from_arg("");
-    std::map<std::string, FluxEnv> flux_cache_;
 
     TString selection_stem() const
     {
@@ -1099,63 +989,6 @@ private:
         return weight * scale * target_a * units;
     }
 
-    FluxEnv& flux_env(const InputSpec& spec)
-    {
-        TString beam_mode = normalize_beam_mode(spec.beam_mode);
-        TString beam_species = normalize_beam_species(spec.beam_species);
-        if (beam_mode == "") beam_mode = infer_beam_mode(spec.path + " " + spec.label + " " + spec.sample);
-        if (beam_species == "") beam_species = infer_beam_species(spec.path + " " + spec.label + " " + spec.sample);
-        const std::string key = std::string(flux_file_.Data()) + "|" + beam_mode.Data() + "|" + beam_species.Data();
-        FluxEnv& env = flux_cache_[key];
-        if (env.initialized) return env;
-        env.initialized = true;
-        env.proposal_emin = proposal_emin_;
-        env.proposal_emax = proposal_emax_;
-
-        if (flux_file_ == "") return env;
-        TFile* file = TFile::Open(flux_file_, "READ");
-        if (!file || file->IsZombie()) {
-            std::cerr << "Could not open coverage NuMI flux file: " << flux_file_.Data()
-                      << "; drawing un-reweighted coverage." << std::endl;
-            if (file) file->Close();
-            return env;
-        }
-
-        std::vector<TString> used;
-        for (const TString& name : flux_hist_paths(beam_mode, beam_species)) {
-            TH1* hist = dynamic_cast<TH1*>(file->Get(name));
-            if (!hist) hist = find_hist(file, hist_leaf_name(name));
-            if (add_flux_hist(hist, env)) used.push_back(name);
-            else std::cerr << "Could not use coverage NuMI flux histogram: " << name.Data() << std::endl;
-        }
-        file->Close();
-        delete file;
-
-        env.mean_bin_flux = mean_flux_in_proposal(env);
-        env.active = !env.hists.empty() && env.mean_bin_flux > 0.0;
-        env.source = flux_file_;
-        env.source += " ";
-        for (int i = 0; i < int(used.size()); ++i) {
-            if (i) env.source += ",";
-            env.source += used[i];
-        }
-        return env;
-    }
-
-    double flux_weight(const InputSpec& spec, double enu)
-    {
-        FluxEnv& env = flux_env(spec);
-        if (!env.active || env.mean_bin_flux <= 0.0) return 1.0;
-        if (enu < env.proposal_emin || enu >= env.proposal_emax) return 0.0;
-        double flux = 0.0;
-        for (TH1* hist : env.hists) {
-            const int bin = hist->FindBin(enu);
-            if (bin < 1 || bin > hist->GetNbinsX()) continue;
-            flux += std::max(0.0, hist->GetBinContent(bin));
-        }
-        return flux / env.mean_bin_flux;
-    }
-
     TH2D* make_coverage_hist(const InputSpec& spec, const PairSpec& pair)
     {
         TFile* file = TFile::Open(spec.path, "READ");
@@ -1196,9 +1029,7 @@ private:
             if (!std::isfinite(x) || !std::isfinite(y)) continue;
             if (x < pair.x.min || x >= pair.x.max || y < pair.y.min || y >= pair.y.max) continue;
 
-            double enu = 0.0;
-            const double flux = value_for_variable(in, variable_for_id("enu"), enu) ? flux_weight(spec, enu) : 1.0;
-            const double weight = event_weight(in) * flux * detector_factor;
+            const double weight = event_weight(in) * detector_factor;
             if (!std::isfinite(weight) || weight <= 0.0) continue;
             hist->Fill(x, y, weight);
         }
@@ -1348,9 +1179,6 @@ void plot_kinematic_coverage(
     TString output_stem = "coverage",
     TString pair_ids = "enu_q2 enu_w q2_w enu_lambda_p w_lambda_p lambda_p_costheta",
     TString selection = "final_hyperon",
-    TString flux_file = "analysis/flux/microboone_numi_flux_5mev.root",
-    double proposal_emin_gev = 0.0,
-    double proposal_emax_gev = 10.0,
     double proton_threshold_gev = 0.30,
     double piminus_threshold_gev = 0.07
 )
@@ -1359,7 +1187,6 @@ void plot_kinematic_coverage(
     plotter.SetPairIds(pair_ids);
     plotter.SetSelection(selection);
     plotter.SetDetectorVisibility(proton_threshold_gev, piminus_threshold_gev);
-    plotter.SetFlux(flux_file, proposal_emin_gev, proposal_emax_gev);
     if (input_source.EndsWith(".csv")) {
         plotter.DrawStatusCsv(input_source, labels_or_groupings);
     } else {
@@ -1374,9 +1201,6 @@ void coverage_plotter(
     TString output_stem = "coverage",
     TString pair_ids = "enu_q2 enu_w q2_w enu_lambda_p w_lambda_p lambda_p_costheta",
     TString selection = "final_hyperon",
-    TString flux_file = "analysis/flux/microboone_numi_flux_5mev.root",
-    double proposal_emin_gev = 0.0,
-    double proposal_emax_gev = 10.0,
     double proton_threshold_gev = 0.30,
     double piminus_threshold_gev = 0.07
 )
@@ -1387,9 +1211,6 @@ void coverage_plotter(
                             output_stem,
                             pair_ids,
                             selection,
-                            flux_file,
-                            proposal_emin_gev,
-                            proposal_emax_gev,
                             proton_threshold_gev,
                             piminus_threshold_gev);
 }
@@ -1400,9 +1221,6 @@ void plot_enu_q2_coverage(
     TString labels_or_groupings = "variation beam generator",
     TString output_stem = "enu_q2_coverage",
     TString selection = "final_hyperon",
-    TString flux_file = "analysis/flux/microboone_numi_flux_5mev.root",
-    double proposal_emin_gev = 0.0,
-    double proposal_emax_gev = 10.0,
     double proton_threshold_gev = 0.30,
     double piminus_threshold_gev = 0.07
 )
@@ -1413,9 +1231,6 @@ void plot_enu_q2_coverage(
                             output_stem,
                             "enu_q2",
                             selection,
-                            flux_file,
-                            proposal_emin_gev,
-                            proposal_emax_gev,
                             proton_threshold_gev,
                             piminus_threshold_gev);
 }

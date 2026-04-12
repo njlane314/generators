@@ -1,14 +1,11 @@
 #include <TAxis.h>
 #include <TCanvas.h>
-#include <TDirectory.h>
 #include <TFile.h>
 #include <TGraphAsymmErrors.h>
 #include <TH1.h>
 #include <TH1D.h>
-#include <TKey.h>
 #include <TLeaf.h>
 #include <TLegend.h>
-#include <TObject.h>
 #include <TPad.h>
 #include <TString.h>
 #include <TStyle.h>
@@ -68,17 +65,6 @@ struct VariableSpec {
     double min = 0.0;
     double max = 0.0;
     bool valid = false;
-};
-
-struct FluxEnv {
-    bool initialized = false;
-    bool active = false;
-    double emin = 0.0;
-    double emax = 0.0;
-    double proposal_emin = 0.0;
-    double proposal_emax = 10.0;
-    double mean_bin_flux = 1.0;
-    std::vector<TH1*> hists;
 };
 
 struct TreeInputs {
@@ -549,152 +535,6 @@ TString normalize_beam_species(TString beam_species)
     return beam_species;
 }
 
-TString flux_hist_path(const TString& beam_mode, const TString& beam_species)
-{
-    TString path = beam_mode;
-    path += "/";
-    path += beam_species;
-    path += "/Detsmear/";
-    path += (beam_species == "numubar" ? "numubar_CV_AV_TPC_5MeV_bin" : "numu_CV_AV_TPC_5MeV_bin");
-    return path;
-}
-
-TString hist_leaf_name(TString path)
-{
-    const Ssiz_t slash = path.Last('/');
-    return slash < 0 ? path : path(slash + 1, path.Length() - slash - 1);
-}
-
-TH1* find_hist(TDirectory* dir, const TString& name)
-{
-    if (!dir) return nullptr;
-    if (TH1* direct = dynamic_cast<TH1*>(dir->Get(name))) return direct;
-    TIter next(dir->GetListOfKeys());
-    while (TKey* key = static_cast<TKey*>(next())) {
-        TObject* obj = key->ReadObj();
-        if (!obj) continue;
-        if (obj->InheritsFrom(TH1::Class()) && name == obj->GetName()) return static_cast<TH1*>(obj);
-        if (obj->InheritsFrom(TDirectory::Class())) {
-            if (TH1* found = find_hist(static_cast<TDirectory*>(obj), name)) return found;
-        }
-    }
-    return nullptr;
-}
-
-bool add_flux_hist(TH1* hist, FluxEnv& env, double floor_fraction)
-{
-    if (!hist || hist->GetMaximum() <= 0.0) return false;
-    const double floor = std::max(0.0, floor_fraction) * hist->GetMaximum();
-    bool found = false;
-    double emin = 0.0;
-    double emax = 0.0;
-    for (int bin = 1; bin <= hist->GetNbinsX(); ++bin) {
-        if (hist->GetBinContent(bin) <= floor) continue;
-        const double low = hist->GetXaxis()->GetBinLowEdge(bin);
-        const double high = hist->GetXaxis()->GetBinUpEdge(bin);
-        emin = found ? std::min(emin, low) : low;
-        emax = found ? std::max(emax, high) : high;
-        found = true;
-    }
-    if (!found) return false;
-    TH1* clone = static_cast<TH1*>(hist->Clone(TString::Format("%s_beam_envelope_flux_%d", hist->GetName(), int(env.hists.size()))));
-    clone->SetDirectory(nullptr);
-    env.hists.push_back(clone);
-    env.emin = env.active ? std::min(env.emin, emin) : emin;
-    env.emax = env.active ? std::max(env.emax, emax) : emax;
-    env.active = true;
-    return true;
-}
-
-double mean_flux_in_proposal(const FluxEnv& env)
-{
-    double total = 0.0;
-    int bins = 0;
-    for (TH1* hist : env.hists) {
-        for (int bin = 1; bin <= hist->GetNbinsX(); ++bin) {
-            const double center = hist->GetXaxis()->GetBinCenter(bin);
-            if (center < env.proposal_emin || center >= env.proposal_emax) continue;
-            total += std::max(0.0, hist->GetBinContent(bin));
-            ++bins;
-        }
-    }
-    return bins > 0 && !env.hists.empty() ? total / (double(bins) / double(env.hists.size())) : 0.0;
-}
-
-FluxEnv read_flux(TString path, TString beam_mode, TString beam_species, double floor_fraction,
-                  double proposal_emin, double proposal_emax)
-{
-    FluxEnv env;
-    env.initialized = true;
-    env.proposal_emin = proposal_emin;
-    env.proposal_emax = proposal_emax;
-    if (path == "") {
-        env.active = true;
-        env.emin = proposal_emin;
-        env.emax = proposal_emax;
-        env.mean_bin_flux = 1.0;
-        return env;
-    }
-
-    TFile* file = TFile::Open(path, "READ");
-    if (!file || file->IsZombie()) {
-        std::cerr << "Could not open NuMI flux file: " << path.Data() << std::endl;
-        if (file) file->Close();
-        return env;
-    }
-
-    TH1* hist = dynamic_cast<TH1*>(file->Get(flux_hist_path(beam_mode, beam_species)));
-    if (!hist) hist = find_hist(file, hist_leaf_name(flux_hist_path(beam_mode, beam_species)));
-    add_flux_hist(hist, env, floor_fraction);
-    file->Close();
-    delete file;
-
-    env.emin = std::max(env.emin, env.proposal_emin);
-    env.emax = std::min(env.emax, env.proposal_emax);
-    env.mean_bin_flux = mean_flux_in_proposal(env);
-    env.active = !env.hists.empty() && env.mean_bin_flux > 0.0 && env.emax > env.emin;
-    if (!env.active) {
-        std::cerr << "No valid NuMI flux envelope for " << beam_mode.Data()
-                  << " " << beam_species.Data() << std::endl;
-    }
-    return env;
-}
-
-FluxEnv& flux_for(const StatusRow& row, const TString& flux_file, double floor_fraction,
-                  double proposal_emin, double proposal_emax,
-                  std::map<std::string, FluxEnv>& cache)
-{
-    const TString beam_mode = normalize_beam_mode(row.beam_mode);
-    const TString beam_species = normalize_beam_species(row.beam_species);
-    const std::string key = std::string(flux_file.Data()) + "|" + beam_mode.Data() + "|" + beam_species.Data();
-    FluxEnv& env = cache[key];
-    if (!env.initialized) env = read_flux(flux_file, beam_mode, beam_species, floor_fraction, proposal_emin, proposal_emax);
-    return env;
-}
-
-double flux_weight(const FluxEnv& env, double enu)
-{
-    if (!env.active || env.mean_bin_flux <= 0.0) return 0.0;
-    if (enu < env.emin || enu >= env.emax) return 0.0;
-    if (env.hists.empty()) return 1.0;
-    double flux = 0.0;
-    for (TH1* hist : env.hists) {
-        const int bin = hist->FindBin(enu);
-        if (bin < 1 || bin > hist->GetNbinsX()) continue;
-        flux += std::max(0.0, hist->GetBinContent(bin));
-    }
-    return flux / env.mean_bin_flux;
-}
-
-void clear_flux_cache(std::map<std::string, FluxEnv>& cache)
-{
-    for (auto& item : cache) {
-        for (TH1* hist : item.second.hists) delete hist;
-        item.second.hists.clear();
-    }
-    cache.clear();
-}
-
 TreeInputs bind_inputs(TTree* tree)
 {
     TreeInputs in;
@@ -775,9 +615,8 @@ TString group_title(TString key)
 }
 
 bool fill_hist(const StatusRow& row, TH1D* hist, const VariableSpec& variable,
-               const TString& selection, const TString& flux_file, double flux_floor_fraction,
-               double proposal_emin, double proposal_emax, double proton_threshold,
-               double piminus_threshold, std::map<std::string, FluxEnv>& flux_cache)
+               const TString& selection, double proton_threshold,
+               double piminus_threshold)
 {
     TFile* file = TFile::Open(row.input_file, "READ");
     if (!file || file->IsZombie()) {
@@ -799,13 +638,6 @@ bool fill_hist(const StatusRow& row, TH1D* hist, const VariableSpec& variable,
         delete file;
         return false;
     }
-    FluxEnv& flux = flux_for(row, flux_file, flux_floor_fraction, proposal_emin, proposal_emax, flux_cache);
-    if (!flux.active) {
-        file->Close();
-        delete file;
-        return false;
-    }
-
     const Long64_t entries = tree->GetEntries();
     for (Long64_t entry = 0; entry < entries; ++entry) {
         tree->GetEntry(entry);
@@ -814,8 +646,7 @@ bool fill_hist(const StatusRow& row, TH1D* hist, const VariableSpec& variable,
         double x = 0.0;
         if (!value_for_variable(in, variable, x)) continue;
         if (!std::isfinite(x) || x < variable.min || x >= variable.max) continue;
-        const double flux_w = flux_weight(flux, value(in.enu));
-        const double weight = event_weight(in) * flux_w * factor;
+        const double weight = event_weight(in) * factor;
         if (!std::isfinite(weight) || weight <= 0.0) continue;
         hist->Fill(x, weight);
     }
@@ -926,10 +757,6 @@ void beam_kinematic_envelope(
     TString output_dir = "analysis/output/beam_kinematic_envelope",
     TString variables = "enu q2 w hyperon_p",
     TString selection = "detector_visible_lambda",
-    TString flux_file = "analysis/flux/microboone_numi_flux_5mev.root",
-    double flux_floor_fraction = 0.0,
-    double proposal_emin_gev = 0.0,
-    double proposal_emax_gev = 10.0,
     double proton_threshold_gev = 0.30,
     double piminus_threshold_gev = 0.07
 )
@@ -948,7 +775,6 @@ void beam_kinematic_envelope(
     std::map<std::string, std::vector<StatusRow>> groups;
     for (const StatusRow& row : rows) groups[group_key(row).Data()].push_back(row);
 
-    std::map<std::string, FluxEnv> flux_cache;
     std::ofstream summary(join_path(output_dir, "beam_kinematic_envelope_summary.csv").Data());
     summary << "group,selection,variable,fhc_integral,rhc_integral,envelope_min_integral,"
             << "envelope_max_integral,rhc_over_fhc,plot_base,csv_file\n";
@@ -982,9 +808,7 @@ void beam_kinematic_envelope(
 
             for (const StatusRow& row : item.second) {
                 TH1D* target = row.beam_mode == "fhc" ? fhc : rhc;
-                fill_hist(row, target, variable, selection, flux_file, flux_floor_fraction,
-                          proposal_emin_gev, proposal_emax_gev, proton_threshold_gev,
-                          piminus_threshold_gev, flux_cache);
+                fill_hist(row, target, variable, selection, proton_threshold_gev, piminus_threshold_gev);
             }
 
             if (fhc->Integral() <= 0.0 && rhc->Integral() <= 0.0) {
@@ -1018,7 +842,6 @@ void beam_kinematic_envelope(
         }
     }
 
-    clear_flux_cache(flux_cache);
     std::cout << "Wrote " << outputs << " beam kinematic envelope outputs under "
               << output_dir.Data() << std::endl;
 }
