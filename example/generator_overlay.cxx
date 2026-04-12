@@ -52,8 +52,6 @@ void generator_overlay() {
 
     std::vector<TString> PlotNames;    
     
-    PlotNames.push_back("TrueMuonCosThetaPlot");
-
     const int NPlots = PlotNames.size();
 
     //------------------------------//	

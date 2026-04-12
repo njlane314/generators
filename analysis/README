@@ -1,0 +1,25 @@
+Lambda analyzer
+
+Run the generator loop from the repository root:
+
+root -l -b -q analysis/loop_generators.cxx
+
+Then make generator comparison plots:
+
+root -l -b -q 'analysis/generator_overlay.cxx'
+
+For one file:
+
+root -l
+root [0] .L analysis/analyser.cxx+
+root [1] analyser("path/to/sample.flat.root", "sample_label").loop()
+
+Outputs:
+
+analysis/output/lambda_analyser_<sample_label>.root
+analysis/output/overlay_*.pdf
+analysis/output/map_*.pdf
+
+This is a first pass over NUISANCE FlatTree_VARS. It uses pdg_vert for primary strange content, final state pdg for final Lambda content, and a p plus pi-minus proxy requiring primary or final hyperon evidence for S0.
+
+The detached Lambda topology still needs the reduced ntuple fields from CONTEXT: nuclear-exit strange species, Lambda decay vertex, daughter ancestry, fiducial flags, decay length, and truth-visible containment flags.

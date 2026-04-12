@@ -1,0 +1,21 @@
+Usage: ./submit_genie.sh [--prod] NUM_JOBS JOB_NAME ARGS_FILE SPLINES_FILE FLUX_FILE FLUX_HIST_NAME OUTPUT_DIRECTORY GIT_CHECKOUT
+
+Before submitting, copy genie_grid.sh to a persistent grid-visible directory such as /pnfs/uboone/persistent/users/apapadop/grid.
+
+JOB_NAME = arbitrary prefix for the output files
+
+ARGS_FILE = text file containing extra arguments to pass to gevgen
+
+SPLINES_FILE = XML file containing the splines for the tune. It must be stored somewhere visible to grid jobs, such as /cvmfs or /pnfs.
+
+FLUX_FILE = ROOT file containing the flux histogram. It must follow the same grid visibility rule.
+
+FLUX_HIST_NAME = name used by TFile::GetObject to retrieve the flux histogram
+
+OUTPUT_DIRECTORY = scratch or persistent output directory
+
+GIT_CHECKOUT = commit hash, origin branch, or version tag to check out for GENIE
+
+Example:
+
+./submit_genie.sh 2 afro_grid_test_gene args.txt /pnfs/uboone/persistent/users/apapadop/grid/14_1000180400_CC_v3_6_0_AR23_20i_00_000.xml /pnfs/uboone/persistent/users/apapadop/grid/MCC9_FluxHist_volTPCActive.root hEnumu_cv /pnfs/uboone/persistent/users/apapadop/grid/ tags/R-3_06_00
