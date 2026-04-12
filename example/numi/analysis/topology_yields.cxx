@@ -23,7 +23,9 @@ struct yield_row {
   TString definition;
   Long64_t raw = 0;
   double weighted = 0.0;
+  double weighted_sum_squares = 0.0;
   double xsec_weighted = 0.0;
+  double xsec_weighted_sum_squares = 0.0;
 };
 
 bool bind_required_branch(TTree* tree, const char* name, void* address)
@@ -89,7 +91,9 @@ void fill(yield_row& row, bool pass, double weighted, double xsec_weighted)
   if (!pass) return;
   ++row.raw;
   row.weighted += weighted;
+  row.weighted_sum_squares += weighted * weighted;
   row.xsec_weighted += xsec_weighted;
+  row.xsec_weighted_sum_squares += xsec_weighted * xsec_weighted;
 }
 
 TString csv_escape(TString value)
@@ -153,7 +157,8 @@ void write_rows(const TString& output_file,
 {
   std::ofstream csv(output_file.Data());
   csv << "sample,generator,knob,category,raw_events,weighted_yield,"
-      << "xsec_weighted_1e38_cm2_per_Ar,definition\n";
+      << "weighted_stat_uncertainty,xsec_weighted_1e38_cm2_per_Ar,"
+      << "xsec_weighted_stat_uncertainty_1e38_cm2_per_Ar,definition\n";
   csv << std::setprecision(12);
   for (const yield_row& row : rows) {
     const TString definition = csv_escape(row.definition);
@@ -166,7 +171,9 @@ void write_rows(const TString& output_file,
         << row.name.Data() << ','
         << row.raw << ','
         << row.weighted << ','
+        << std::sqrt(row.weighted_sum_squares) << ','
         << row.xsec_weighted << ','
+        << std::sqrt(row.xsec_weighted_sum_squares) << ','
         << definition.Data() << '\n';
   }
 }
@@ -179,13 +186,15 @@ void print_rows(const TString& generator, const TString& knob, const std::vector
   std::cout << std::left << std::setw(36) << "category"
             << std::right << std::setw(12) << "raw"
             << std::setw(18) << "weighted"
+            << std::setw(18) << "stat"
             << std::setw(24) << "xsec_1e38_per_Ar" << '\n';
-  std::cout << std::string(90, '-') << '\n';
+  std::cout << std::string(108, '-') << '\n';
   std::cout << std::setprecision(8);
   for (const yield_row& row : rows) {
     std::cout << std::left << std::setw(36) << row.name.Data()
               << std::right << std::setw(12) << row.raw
               << std::setw(18) << row.weighted
+              << std::setw(18) << std::sqrt(row.weighted_sum_squares)
               << std::setw(24) << row.xsec_weighted << '\n';
   }
 }
