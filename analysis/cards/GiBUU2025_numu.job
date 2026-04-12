@@ -9,8 +9,8 @@
 !------------------------------------------------------------------------------
 ! DON'T  FORGET to change  "path_to_input" in the namelist &input according to your local GiBUU installation
 !------------------------------------------------------------------------------
-! This jobcard is set up for a generated flat 0-10 GeV proposal flux.
-! Change "nuExp" and "FileNameFlux" in &neutrino_induced for another proposal.
+! The analysis wrapper replaces "nuExp" and "FileNameFlux" in &neutrino_induced
+! with the requested NuMI generation flux.
 !------------------------------------------------------------------------------
 ! In this jobcard some of the analysis is switched OFF, see namelist &neutrinoAnalysis;
 ! the output of final events and particles in each event is given to the file FinalEvents.dat

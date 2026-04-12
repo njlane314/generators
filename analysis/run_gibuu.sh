@@ -32,6 +32,7 @@ esac
 proposal_min_gev="${proposal_min_gev:-0}"
 proposal_max_gev="${proposal_max_gev:-10}"
 proposal_bin_width_gev="${proposal_bin_width_gev:-0.005}"
+generation_flux_mode="${generation_flux_mode:-numi}"
 skim_final_state="${skim_final_state:-1}"
 
 base_job="${base_job:-${repo_root}/analysis/cards/GiBUU2025_numu.job}"
@@ -67,19 +68,19 @@ if [ -z "${gibuu_input:-}" ]; then
   done
   gibuu_input="${gibuu_input:-${repo_root}/GiBUU/buuinput}"
 fi
-reweight_fluxfile="${reweight_fluxfile:-$(ana_flux_root "${repo_root}")}"
-reweight_fluxhisto="${reweight_fluxhisto:-$(ana_flux_hist "${beam_mode}" "${beam_species}")}"
+generation_fluxfile="${generation_fluxfile:-${reweight_fluxfile_dat:-$(ana_flux_dat "${repo_root}" "${beam_mode}" "${beam_species}")}}"
+preparation_fluxfile="${preparation_fluxfile:-${reweight_fluxfile:-$(ana_flux_root "${repo_root}")}}"
+preparation_fluxhisto="${preparation_fluxhisto:-${reweight_fluxhisto:-$(ana_flux_hist "${beam_mode}" "${beam_species}")}}"
 sample="${sample:-GiBUU${version}_NuMI_${beam_mode}_${beam_species}_${interaction}_all_strange_filter_${fsi_state}}"
 outdir="${outdir:-${repo_root}/analysis/output/proxy_flat/GiBUU}"
 workdir="${workdir:-${repo_root}/analysis/output/work/GiBUU/${sample}}"
-proposal_fluxfile="${proposal_fluxfile:-${workdir}/flat_0_10gev_5mev.dat}"
 job_card="${job_card:-${workdir}/${sample}.job}"
 gibuu_event_root="${gibuu_event_root:-EventOutput.Pert.00000001.root}"
 
 ana_check_cmds PrepareGiBUU nuisflat awk
 [ "${skim_final_state}" = 1 ] && ana_check_cmds root
 ana_check_exe "${gibuu_bin}"
-ana_check_files "${base_job}" "${reweight_fluxfile}"
+ana_check_files "${base_job}" "${preparation_fluxfile}"
 [ -d "${gibuu_input}" ] || ana_die "missing GiBUU input directory: ${gibuu_input}"
 mkdir -p "${outdir}" "${workdir}"
 
@@ -112,7 +113,20 @@ case "${knob}" in
   *) ana_die "unsupported GiBUU knob: ${knob}" ;;
 esac
 
-ana_write_flat_flux_dat "${proposal_fluxfile}" "${proposal_min_gev}" "${proposal_max_gev}" "${proposal_bin_width_gev}"
+case "${generation_flux_mode}" in
+  numi)
+    proposal_fluxfile="${proposal_fluxfile:-${workdir}/numi_${beam_mode}_${beam_species}_${proposal_min_gev}_${proposal_max_gev}gev.dat}"
+    proposal_label="NuMI ${beam_mode} ${beam_species}: ${proposal_fluxfile}"
+    ana_check_files "${generation_fluxfile}"
+    ana_write_flux_dat_window "${proposal_fluxfile}" "${generation_fluxfile}" "${proposal_min_gev}" "${proposal_max_gev}"
+    ;;
+  flat)
+    proposal_fluxfile="${proposal_fluxfile:-${workdir}/flat_0_10gev_5mev.dat}"
+    proposal_label="flat ${proposal_min_gev}-${proposal_max_gev} GeV, bin ${proposal_bin_width_gev} GeV: ${proposal_fluxfile}"
+    ana_write_flat_flux_dat "${proposal_fluxfile}" "${proposal_min_gev}" "${proposal_max_gev}" "${proposal_bin_width_gev}"
+    ;;
+  *) ana_die "unsupported generation_flux_mode: ${generation_flux_mode}" ;;
+esac
 
 awk \
   -v process_id="${process_id}" \
@@ -154,15 +168,15 @@ raw_flat="${flat}"
 printf 'GiBUU sample: %s\n' "${sample}"
 printf '  requested proposal events: %s\n' "${events}"
 printf '  GiBUU numEnsembles: %s (events/ensemble correction: %s)\n' "${num_ensembles}" "${gibuu_events_per_ensemble}"
-printf '  flat proposal: %s\n' "${proposal_fluxfile}"
-printf '  NuMI reweight target: %s,%s\n' "${reweight_fluxfile}" "${reweight_fluxhisto}"
+printf '  generation flux: %s\n' "${proposal_label}"
+printf '  preparation flux: %s,%s\n' "${preparation_fluxfile}" "${preparation_fluxhisto}"
 printf '  output: %s\n' "${flat}"
 
 (
   cd "${workdir}"
   "${gibuu_bin}" < "${job_card}"
   [ -s "${gibuu_event_root}" ] || ana_die "GiBUU did not write ${workdir}/${gibuu_event_root}"
-  PrepareGiBUU -i "${gibuu_event_root}" -f "${reweight_fluxfile},${reweight_fluxhisto}" -o "${prep}"
+  PrepareGiBUU -i "${gibuu_event_root}" -f "${preparation_fluxfile},${preparation_fluxhisto}" -o "${prep}"
   nuisflat -i "GiBUU:${prep}" -o "${raw_flat}"
 )
 [ "${skim_final_state}" = 1 ] && ana_skim_final_state_hyperon "${script_dir}/skim_final_state_hyperon.cxx" "${raw_flat}" "${flat}" -1 "${skim_count_path:-}"

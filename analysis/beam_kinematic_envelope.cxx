@@ -628,6 +628,13 @@ FluxEnv read_flux(TString path, TString beam_mode, TString beam_species, double 
     env.initialized = true;
     env.proposal_emin = proposal_emin;
     env.proposal_emax = proposal_emax;
+    if (path == "") {
+        env.active = true;
+        env.emin = proposal_emin;
+        env.emax = proposal_emax;
+        env.mean_bin_flux = 1.0;
+        return env;
+    }
 
     TFile* file = TFile::Open(path, "READ");
     if (!file || file->IsZombie()) {
@@ -669,6 +676,7 @@ double flux_weight(const FluxEnv& env, double enu)
 {
     if (!env.active || env.mean_bin_flux <= 0.0) return 0.0;
     if (enu < env.emin || enu >= env.emax) return 0.0;
+    if (env.hists.empty()) return 1.0;
     double flux = 0.0;
     for (TH1* hist : env.hists) {
         const int bin = hist->FindBin(enu);
@@ -900,8 +908,8 @@ void draw_plot(const TString& path_base, const TString& key, const VariableSpec&
     legend.SetBorderSize(0);
     legend.SetFillStyle(0);
     legend.SetHeader(selection.Data());
-    legend.AddEntry(fhc, "FHC reweight", "l");
-    legend.AddEntry(rhc, "RHC reweight", "l");
+    legend.AddEntry(fhc, "FHC", "l");
+    legend.AddEntry(rhc, "RHC", "l");
     legend.AddEntry(band, "FHC/RHC envelope", "f");
     legend.Draw();
 

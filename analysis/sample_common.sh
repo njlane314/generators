@@ -112,6 +112,31 @@ ana_nuwro_beam_energy() {
     }'
 }
 
+ana_nuwro_beam_energy_from_flux() {
+  awk -v min_gev="$2" -v max_gev="$3" -v bin_width_gev="$4" '
+    BEGIN {
+      emin = min_gev * 1000.0
+      emax = max_gev * 1000.0
+      step = bin_width_gev * 1000.0
+      invalid = (step <= 0 || emax <= emin)
+      n = int(((emax - emin) / step) + 0.5)
+    }
+    /^[[:space:]]*#/ || NF < 2 { next }
+    {
+      flux[sprintf("%.7f", $1 + 0.0)] = $2 + 0.0
+    }
+    END {
+      if (invalid || n <= 0) exit 1
+      printf "%.12g %.12g", emin, emax
+      for (i = 0; i < n; ++i) {
+        e = min_gev + (i + 0.5) * bin_width_gev
+        key = sprintf("%.7f", e)
+        printf " %.12g", (key in flux ? flux[key] : 0.0)
+      }
+      printf "\n"
+    }' "$1"
+}
+
 ana_write_flat_flux_dat() {
   mkdir -p "$(dirname "$1")"
   awk -v min_gev="$2" -v max_gev="$3" -v bin_width_gev="$4" '
@@ -123,6 +148,16 @@ ana_write_flat_flux_dat() {
         printf "%.7f 1.000000000000e+00\n", e
       }
     }' > "$1"
+}
+
+ana_write_flux_dat_window() {
+  mkdir -p "$(dirname "$1")"
+  awk -v min_gev="$3" -v max_gev="$4" '
+    BEGIN { print "# energy_GeV flux_weight" }
+    /^[[:space:]]*#/ || NF < 2 { next }
+    $1 >= min_gev && $1 < max_gev {
+      printf "%.7f %.12e\n", $1, $2
+    }' "$2" > "$1"
 }
 
 ana_flux_integral() {

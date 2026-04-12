@@ -29,17 +29,15 @@ comparable to GENIE and NuWro for the same `events`.  Set `run_plots=1` to also
 exercise the
 kinematic-envelope and coverage plot macros.  Use
 `plan=analysis/config/generator_loop_plan.tsv` only when you want the full
-44-row analysis matrix.  The full plan now uses FHC/RHC beam reweighting for
-GENIE and NuWro: RHC analysis rows read the FHC-generated flat proposal and
-apply the RHC NuMI flux reweight downstream.  GiBUU remains beam-specific
-because `PrepareGiBUU` receives the beam flux during flat preparation.  With the
-current full plan this means 44 analysis rows but 26 generated flat samples.
+44-row analysis matrix.  The sample runners now generate directly from the
+matching NuMI flux for each FHC/RHC and species row, then the matrix and yield
+steps run without an additional downstream flux reweight.  With the current
+full plan this means 44 analysis rows and 44 generated flux-shaped samples.
 Set `dry_run=1` on `analysis/run_sample_matrix.sh` to print the proposal sample
 list without running generators.
 
 These are analysis-local copies of the example generator runners with paths
-updated to use `analysis/flux` for the NuMI reweight target, keep the
-generation proposal flat over 0-10 GeV, and write flat outputs into
+updated to use `analysis/flux` as the generator-time NuMI flux input and write flat outputs into
 `analysis/output/proxy_flat/<generator>`.  Matrix production always writes final
 outputs selected by `analysis/skim_final_state_hyperon.cxx`, requiring at least
 one final-state Lambda, Sigma0, Xi0, Xi-, or Omega- with no momentum cut.
@@ -65,8 +63,9 @@ analysis/run_expected_event_yields.sh analysis/output/matrix/generator_matrix_st
 
 This scans the generator-matrix flat ntuples with the analysis final-state rule:
 final-state PDG in {3122,3212,3322,3312,3334}, with no momentum threshold. It
-applies the species-aware normalized NuMI flux reweight over the flat 0-10 GeV
-proposal, writes a per-variation yield table, and writes two uncertainty
+does not apply a flux reweight when run through `run_pipeline_smoke.sh`, because
+the default samples are already generated from the matching NuMI flux. It writes
+a per-variation yield table and two uncertainty
 summaries: one that envelopes version/knob variations at fixed FSI state and
 one that also envelopes FSI-state differences. It also writes generator
 envelope yield summaries that hold beam mode/species and interaction fixed,
@@ -84,7 +83,7 @@ visible momentum thresholds. The default thresholds are p_p > 0.30 GeV and
 p_pi_minus > 0.07 GeV, and can be overridden as the final two wrapper
 arguments:
 
-analysis/run_expected_event_yields.sh analysis/output/matrix/generator_matrix_status.csv analysis/output/expected_event_yields analysis/flux/microboone_numi_flux_5mev.root 0.0 0.0 10.0 1.0 0.30 0.07
+analysis/run_expected_event_yields.sh analysis/output/matrix/generator_matrix_status.csv analysis/output/expected_event_yields "" 0.0 0.0 10.0 1.0 0.30 0.07
 
 This is a truth-level decay/threshold envelope. It does not replace the later
 full geometry, containment, detached-vertex, and Stage C/D reduced-ntuple
@@ -114,8 +113,8 @@ Then make the FHC/RHC kinematic beam envelope:
 analysis/run_beam_kinematic_envelope.sh analysis/output/matrix/generator_matrix_status.csv analysis/output/beam_kinematic_envelope
 
 This groups samples by generator, version, variation, knob, beam species,
-interaction, and FSI state, then overlays the FHC and RHC NuMI-reweighted
-kinematic spectra. The default variables are `enu q2 w hyperon_p`, and the
+interaction, and FSI state, then overlays the FHC and RHC flux-shaped kinematic
+spectra. The default variables are `enu q2 w hyperon_p`, and the
 default selection is the detector-visible Lambda envelope above. Each output
 has a shaded per-bin FHC/RHC envelope plus a CSV table with FHC yield, RHC
 yield, min/max envelope, and RHC/FHC ratio. Change the selection with the
@@ -173,8 +172,8 @@ It draws 70%, 90%, and 99% highest-density weighted-yield contours like the old
 NuMI coverage macros, but it reads the generator-matrix status CSV and defaults
 to the analysis final-state hyperon rule: final-state PDG
 in {3122,3212,3322,3312,3334}, with no momentum threshold where FlatTree
-final-state PDGs are available. It also applies the normalized NuMI flux
-reweight over the flat 0-10 GeV proposal by default. Pass an explicit
+final-state PDGs are available. For the default flux-shaped samples, pass an
+empty flux-file argument so coverage is not reweighted a second time. Pass an explicit
 comma-separated ROOT-file list instead of the status CSV to compare custom
 files; in that mode the third argument is a matching comma-separated label
 list. For detector-visibility selections, the contour weights are additionally
@@ -190,13 +189,13 @@ root [1] analyser("path/to/sample.flat.root", "sample_label").loop()
 
 Primary mechanism study for one inclusive Lambda-topology sample:
 
-root -l -b -q 'analysis/primary_mechanism.cxx+("path/to/inclusive.flat.root","analysis/output","sample_label","GENIE","nominal","nominal","analysis/flux/microboone_numi_flux_5mev.root",0.0,"fhc",0.0,10.0,"numu")'
+root -l -b -q 'analysis/primary_mechanism.cxx+("path/to/inclusive.flat.root","analysis/output","sample_label","GENIE","nominal","nominal","",0.0,"fhc",0.0,10.0,"numu")'
 
 Nuclear-exit migration study for one reduced ntuple sample:
 
-root -l -b -q 'analysis/nuclear_exit.cxx+("path/to/reduced.flat.root","analysis/output","sample_label","GENIE","nominal","analysis/flux/microboone_numi_flux_5mev.root",0.0,"fhc",0.0,10.0,"numu")'
+root -l -b -q 'analysis/nuclear_exit.cxx+("path/to/reduced.flat.root","analysis/output","sample_label","GENIE","nominal","",0.0,"fhc",0.0,10.0,"numu")'
 
-Use the beam-polarity argument as "fhc", "rhc", or "combined", and pass an optional final beam-species argument as "numu" or "numubar". The matrix loop passes this from `analysis/config/generator_loop_plan.tsv`, so FHC numubar and RHC numu rows use the matching species-specific NuMI flux histograms. The current GENIE and NuWro production strategy is flat in E_nu over 0-10 GeV and beam-independent, so the full plan uses the same generated flat proposal for FHC and RHC and lets these macros apply the normalized NuMI flux reweight. GiBUU rows are still prepared separately by beam. Optional final arguments can override the proposal range, for example `..., "fhc", 0.0, 10.0, "numu"`.
+Use the beam-polarity argument as "fhc", "rhc", or "combined", and pass an optional final beam-species argument as "numu" or "numubar". The matrix loop passes this from `analysis/config/generator_loop_plan.tsv`. The current production strategy is beam-specific and flux-shaped at generation time, so pass an empty flux file to these macros unless you are intentionally analyzing an older flat proposal sample. Optional final arguments can override the analysis energy window, for example `..., "fhc", 0.0, 10.0, "numu"`.
 
 Outputs:
 
@@ -245,8 +244,8 @@ analysis/output/nuclear_exit_<sample_label>_<beam_polarity>_raw_exit_pdg.csv
 
 This is a first pass over NUISANCE FlatTree_VARS. It uses pdg_vert for primary strange content, final state pdg for final Lambda content, and a p plus pi-minus proxy requiring primary or final hyperon evidence for S0.
 
-The primary mechanism macro keeps the Lambda-topology sample inclusive, then reports the selected sample by primary strange origin and generator Mode category with sample, generator, knob, beam_polarity, and statistical uncertainty columns. It first restricts all reported counts and spectra to the selected non-zero MicroBooNE NuMI flux envelope and multiplies event weights by the selected NuMI flux histogram divided by its mean bin content over the flat proposal range. It refuses to run if it cannot load that envelope or the sample has no Enu_true branch. If reduced topology flags such as topology_nominal_flag or fiducial_vertex_flag are not present, it falls back to a FlatTree proxy requiring final-state Lambda plus visible-proxy proton and pi-minus, and prints that caveat in the ROOT metadata and terminal output.
+The primary mechanism macro keeps the Lambda-topology sample inclusive, then reports the selected sample by primary strange origin and generator Mode category with sample, generator, knob, beam_polarity, and statistical uncertainty columns. With an empty flux-file argument it restricts reported counts and spectra to the analysis energy window without changing event weights; with a flux file it applies the normalized NuMI flux histogram weight for older flat proposal samples. If reduced topology flags such as topology_nominal_flag or fiducial_vertex_flag are not present, it falls back to a FlatTree proxy requiring final-state Lambda plus visible-proxy proton and pi-minus, and prints that caveat in the ROOT metadata and terminal output.
 
-The nuclear-exit macro uses the same flat-proposal NuMI flux reweight and writes sample, generator, knob, and beam_polarity columns. It requires explicit Stage B branches such as n_exitp plus pdg_exit, or nuclear_exit_n plus nuclear_exit_pdg, and it refuses to use final-state pdg as a nuclear-exit proxy.
+The nuclear-exit macro uses the same energy-window or optional flux-file handling and writes sample, generator, knob, and beam_polarity columns. It requires explicit Stage B branches such as n_exitp plus pdg_exit, or nuclear_exit_n plus nuclear_exit_pdg, and it refuses to use final-state pdg as a nuclear-exit proxy.
 
 The detached Lambda topology still needs the reduced ntuple fields from CONTEXT: nuclear-exit strange species, Lambda decay vertex, daughter ancestry, fiducial flags, decay length, and truth-visible containment flags.

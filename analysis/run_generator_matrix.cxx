@@ -140,11 +140,7 @@ TString beam_polarity_from_mode(TString beam_mode)
 
 TString generation_beam_mode_for(const TString& generator, TString beam_mode)
 {
-    TString gen = generator;
-    gen.ToLower();
-    TString mode = beam_mode;
-    mode.ToLower();
-    if ((gen == "genie" || gen == "nuwro") && (mode == "fhc" || mode == "rhc")) return "FHC";
+    (void)generator;
     return beam_mode;
 }
 

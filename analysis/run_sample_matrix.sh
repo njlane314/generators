@@ -12,6 +12,7 @@ generator_filter="${generator_filter:-}"
 max_samples="${max_samples:-0}"
 seed_base="${seed_base:-1000}"
 gibuu_events_per_ensemble="${gibuu_events_per_ensemble:-5}"
+generation_flux_mode="${generation_flux_mode:-numi}"
 proposal_events="${events}"
 generated_output_paths=""
 generated_runs=0
@@ -41,17 +42,7 @@ split_csv() {
 }
 
 canonical_generation_beam_mode() {
-  local gen="$1"
-  local mode="$2"
-  local lower_gen
-  local lower_mode
-  lower_gen="$(printf '%s' "${gen}" | tr '[:upper:]' '[:lower:]')"
-  lower_mode="$(printf '%s' "${mode}" | tr '[:upper:]' '[:lower:]')"
-
-  case "${lower_gen}:${lower_mode}" in
-    genie:fhc|genie:rhc|nuwro:fhc|nuwro:rhc) printf '%s\n' FHC ;;
-    *) printf '%s\n' "${mode}" ;;
-  esac
+  printf '%s\n' "$2"
 }
 
 expand_template() {
@@ -102,6 +93,7 @@ run_generator_sample() {
       beam_mode="${generation_beam_mode}" \
       beam_species="${species}" \
       interaction="${interaction}" \
+      generation_flux_mode="${generation_flux_mode}" \
       run="$((seed_base + n))" \
       sample="${sample_label}" \
       outdir="${outdir}" \
@@ -119,6 +111,7 @@ run_generator_sample() {
       beam_species="${species}" \
       interaction="${interaction}" \
       fsi_state="${fsi_state}" \
+      generation_flux_mode="${generation_flux_mode}" \
       sample="${sample_label}" \
       outdir="${outdir}" \
       workdir="${workdir}" \
@@ -136,6 +129,7 @@ run_generator_sample() {
       beam_species="${species}" \
       interaction="${interaction}" \
       fsi_state="${fsi_state}" \
+      generation_flux_mode="${generation_flux_mode}" \
       sample="${sample_label}" \
       outdir="${outdir}" \
       workdir="${workdir}" \
@@ -160,7 +154,7 @@ run_sample() {
 
   if has_generated_output_path "${output_path}"; then
     reused_runs=$((reused_runs + 1))
-    printf 'reuse beam-reweighted [%04d] %s analysis_beam=%s generation_beam=%s input=%s sample=%s\n' \
+    printf 'reuse generated [%04d] %s analysis_beam=%s generation_beam=%s input=%s sample=%s\n' \
       "${n}" "${generator}" "${beam_mode}" "${generation_beam_mode}" "${output_path}" "${sample_label}"
     return 0
   fi

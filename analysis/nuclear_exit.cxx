@@ -412,6 +412,14 @@ flux_envelope read_flux(TString path, TString beam_polarity, TString beam_specie
     flux_envelope env;
     env.proposal_emin = proposal_emin;
     env.proposal_emax = proposal_emax;
+    if (path == "") {
+        env.active = true;
+        env.emin = proposal_emin;
+        env.emax = proposal_emax;
+        env.mean_bin_flux = 1.0;
+        env.source = "no_flux_reweight";
+        return env;
+    }
     beam_polarity = normalize_beam_polarity(beam_polarity);
     if (beam_polarity == "") {
         std::cerr << "Beam polarity must be FHC, RHC, or combined." << std::endl;
@@ -463,6 +471,7 @@ bool in_flux(const flux_envelope& env, double enu)
 double flux_reweight(const flux_envelope& env, double enu)
 {
     if (!in_flux(env, enu) || env.mean_bin_flux <= 0.0) return 0.0;
+    if (env.hists.empty()) return 1.0;
     double flux = 0.0;
     for (TH1* hist : env.hists) {
         const int bin = hist->FindBin(enu);
@@ -600,7 +609,7 @@ void nuclear_exit(
 
     TLeaf* enu = leaf(tree, {"Enu_true", "enu_true"});
     if (!enu) {
-        std::cerr << "Missing Enu_true/enu_true branch; cannot apply the NuMI flux envelope." << std::endl;
+        std::cerr << "Missing Enu_true/enu_true branch; cannot apply the analysis energy window." << std::endl;
         input->Close();
         return;
     }
@@ -609,7 +618,7 @@ void nuclear_exit(
     const flux_envelope flux = read_flux(flux_file, beam_polarity, beam_species, flux_floor_fraction,
                                          proposal_emin_gev, proposal_emax_gev);
     if (!flux.active) {
-        std::cerr << "Refusing to make nuclear-exit summaries without a NuMI flux envelope." << std::endl;
+        std::cerr << "Refusing to make nuclear-exit summaries without an active flux or energy window." << std::endl;
         input->Close();
         return;
     }
