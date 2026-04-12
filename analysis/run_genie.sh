@@ -18,6 +18,7 @@ interaction="${interaction:-CC}"
 run="${run:-1}"
 proposal_min_gev="${proposal_min_gev:-0}"
 proposal_max_gev="${proposal_max_gev:-10}"
+proposal_flux="${proposal_flux:-1}"
 skim_final_state="${skim_final_state:-1}"
 make_spline="${make_spline:-auto}"
 
@@ -60,6 +61,7 @@ raw_flat="${flat}"
 
 printf 'GENIE sample: %s\n' "${sample}"
 printf '  flat proposal: %s-%s GeV\n' "${proposal_min_gev}" "${proposal_max_gev}"
+printf '  GENIE proposal flux: %s\n' "${proposal_flux}"
 printf '  NuMI reweight target: %s,%s\n' "${reweight_fluxfile}" "${reweight_fluxhisto}"
 printf '  output: %s\n' "${flat}"
 
@@ -68,6 +70,7 @@ gevgen \
   -p "${probe}" \
   -t "${target}" \
   -e "${proposal_min_gev},${proposal_max_gev}" \
+  -f "${proposal_flux}" \
   -r "${run}" \
   --event-generator-list "${interaction}" \
   --tune "${tune}" \
