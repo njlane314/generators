@@ -4,9 +4,138 @@ Run the generator loop from the repository root:
 
 root -l -b -q analysis/loop_generators.cxx
 
+The loop is manifest-driven by `ana/config/generator_loop_plan.tsv`. It expands
+generator, version, knob/config, beam mode, beam species, interaction, and FSI
+state lists, skips missing files, and writes
+`analysis/output/matrix/generator_matrix_status.csv`.
+
+Equivalent explicit call:
+
+analysis/run_generator_matrix.sh ana/config/generator_loop_plan.tsv analysis/output/matrix
+
+The default loop runs `primary_mechanism` for present flat trees and runs
+`nuclear_exit` only when explicit Stage B exit branches are present. Edit the
+plan file's `input_template`, `sample_template`, and run flags when moving from
+proxy flats to reduced analysis flats.
+
+First make expected event-yield tables with statistical and systematic
+uncertainties:
+
+analysis/run_expected_event_yields.sh analysis/output/matrix/generator_matrix_status.csv analysis/output/expected_event_yields
+
+This scans the generator-matrix flat ntuples with the `ana` final-state rule:
+final-state PDG in {3122,3212,3322,3312,3334}, with no momentum threshold. It
+applies the species-aware normalized NuMI flux reweight over the flat 0-10 GeV
+proposal, writes a per-variation yield table, and writes two uncertainty
+summaries: one that envelopes version/knob variations at fixed FSI state and
+one that also envelopes FSI-state differences. It also writes generator
+envelope yield summaries that hold beam mode/species and interaction fixed,
+then vary generator, version, tune/configuration, knob, and optionally FSI
+state. The `expected_events` column is scaled by the optional final
+`EXPOSURE_SCALE` argument. With the default scale of 1, it is a unit-normalized
+analysis yield; pass an exposure/POT/target scale when absolute detector event
+counts are needed.
+
+The expected-yields macro also writes fast detector-envelope categories. These
+leave the final-state generator sample definition untouched, then correct the
+event weights for Lambda reachability, the Lambda -> p pi- branching ratio
+0.639, and the probability that the Lambda-decay proton and pi- pass the
+visible momentum thresholds. The default thresholds are p_p > 0.30 GeV and
+p_pi_minus > 0.07 GeV, and can be overridden as the final two wrapper
+arguments:
+
+analysis/run_expected_event_yields.sh analysis/output/matrix/generator_matrix_status.csv analysis/output/expected_event_yields example/numi/flux/microboone_numi_flux_5mev.root 0.0 0.0 10.0 1.0 0.30 0.07
+
+This is a truth-level decay/threshold envelope. It does not replace the later
+full geometry, containment, detached-vertex, and Stage C/D reduced-ntuple
+envelope. Parent-seeded detector-envelope rows are composition rows and can
+overlap; use `detector_visible_Lambda_to_p_piminus` as the inclusive corrected
+event-yield row.
+
+Then test phenomenological yield sensitivity to generator model choices:
+
+analysis/run_phenomenology_sensitivity.sh analysis/output/expected_event_yields/expected_event_yields_by_variation.csv analysis/output/phenomenology_sensitivity
+
+This is a small AWK post-processor over the per-variation yield table. It uses
+the detector-visible category by default and groups at fixed beam mode/species.
+The summary table reports whether the yield envelope is large relative to the
+central row or its statistical uncertainty. The member table reports the yield
+shift if a variation is favoured and the leave-one-out envelope contraction if
+that variation is excluded. Use the fourth argument to change the grouping:
+`beam`, `beam_envelope`, `all_beam`, or `generator`.
+
+Then make the FHC/RHC kinematic beam envelope:
+
+analysis/run_beam_kinematic_envelope.sh analysis/output/matrix/generator_matrix_status.csv analysis/output/beam_kinematic_envelope
+
+This groups samples by generator, version, variation, knob, beam species,
+interaction, and FSI state, then overlays the FHC and RHC NuMI-reweighted
+kinematic spectra. The default variables are `enu q2 w hyperon_p`, and the
+default selection is the detector-visible Lambda envelope above. Each output
+has a shaded per-bin FHC/RHC envelope plus a CSV table with FHC yield, RHC
+yield, min/max envelope, and RHC/FHC ratio. Change the selection with the
+fourth argument, for example `final_hyperon` or `detector_branching`.
+
+Then make the generator/configuration kinematic envelope:
+
+analysis/run_generator_kinematic_envelope.sh analysis/output/matrix/generator_matrix_status.csv analysis/output/generator_kinematic_envelope
+
+This holds beam mode, beam species, and interaction fixed, then envelopes the
+generator, version, tune/configuration, knob, and FSI-state variations. The
+default selection and variables match the beam envelope. The final optional
+`FIX_FSI` argument defaults to `false`; set it to `true` to compare generator,
+version, configuration, and knob variations at fixed FSI state instead of
+enveloping FSI on/off together.
+
 Then make generator comparison plots:
 
 root -l -b -q 'analysis/generator_overlay.cxx'
+
+For the manifest-driven matrix outputs, use:
+
+analysis/plot_generator_matrix.sh analysis/output/matrix/generator_matrix_status.csv analysis/output/matrix analysis/output/matrix/plots
+
+This makes primary-mechanism and nuclear-exit overlays grouped by variation,
+beam, and generator, plus per-sample 2D maps where the corresponding ROOT
+objects exist. The legacy `generator_overlay.cxx` entry point now delegates to
+this matrix plotter.
+
+Then make old-jobcard-style kinematic coverage contours:
+
+analysis/run_kinematic_coverage.sh analysis/output/matrix/generator_matrix_status.csv analysis/output/coverage "variation beam generator"
+
+The same coverage plotter can run through detector-visibility assumptions:
+
+analysis/run_detector_visibility_coverage.sh analysis/output/matrix/generator_matrix_status.csv analysis/output/coverage/detector_visibility "variation beam generator"
+
+The default detector-visibility set makes coverage plots for the raw final
+hyperon selection, branching-only Lambda reachability, and loose/nominal/tight
+visible Lambda -> p pi- daughter momentum thresholds. It writes one directory
+per assumption plus `detector_visibility_coverage_assumptions.tsv`. To scan
+custom assumptions, pass a comma-separated list of
+`label:selection:proton_threshold:piminus_threshold` entries as the sixth
+argument, for example
+`nom:detector_visible_lambda:0.30:0.07,tight:detector_visible_lambda:0.45:0.12`.
+
+For the E_nu-vs-Q2 shortcut:
+
+analysis/run_enu_q2_coverage.sh analysis/output/matrix/generator_matrix_status.csv analysis/output/coverage/enu_q2 "variation beam generator"
+
+The coverage plotter is implemented as `AnaCoverage::CoveragePlotter` in
+`analysis/coverage_plotter.cxx`, with old-jobcard-style entry points
+`analysis/plot_kinematic_coverage.cxx` and `analysis/plot_enu_q2_coverage.cxx`.
+It draws 70%, 90%, and 99% highest-density weighted-yield contours like the old
+`jobcards/numi/analysis` coverage macros, but it reads the generator-matrix
+status CSV and defaults to the `ana` final-state hyperon rule: final-state PDG
+in {3122,3212,3322,3312,3334}, with no momentum threshold where FlatTree
+final-state PDGs are available. It also applies the normalized NuMI flux
+reweight over the flat 0-10 GeV proposal by default. Pass an explicit
+comma-separated ROOT-file list instead of the status CSV to compare custom
+files; in that mode the third argument is a matching comma-separated label
+list. For detector-visibility selections, the contour weights are additionally
+multiplied by the fast truth-level Lambda reachability, Lambda -> p pi-
+branching ratio, and daughter-threshold acceptance used in the yield and
+kinematic-envelope macros.
 
 For one file:
 
@@ -26,13 +155,13 @@ The matrix macro also writes analysis/output/topology_yields_uncertainties.csv w
 
 Primary mechanism study for one inclusive Lambda-topology sample:
 
-root -l -b -q 'analysis/primary_mechanism.cxx+("path/to/inclusive.flat.root","analysis/output","sample_label","GENIE","nominal","nominal","example/numi/flux/microboone_numi_flux_5mev.root",0.0,"fhc")'
+root -l -b -q 'analysis/primary_mechanism.cxx+("path/to/inclusive.flat.root","analysis/output","sample_label","GENIE","nominal","nominal","example/numi/flux/microboone_numi_flux_5mev.root",0.0,"fhc",0.0,10.0,"numu")'
 
 Nuclear-exit migration study for one reduced ntuple sample:
 
-root -l -b -q 'analysis/nuclear_exit.cxx+("path/to/reduced.flat.root","analysis/output","sample_label","GENIE","nominal","example/numi/flux/microboone_numi_flux_5mev.root",0.0,"fhc")'
+root -l -b -q 'analysis/nuclear_exit.cxx+("path/to/reduced.flat.root","analysis/output","sample_label","GENIE","nominal","example/numi/flux/microboone_numi_flux_5mev.root",0.0,"fhc",0.0,10.0,"numu")'
 
-Use the last argument as "fhc", "rhc", or "combined". The bundled NuMI flux file exposes numu and numubar histograms; these macros use numu for fhc, numubar for rhc, and their union for combined.
+Use the beam-polarity argument as "fhc", "rhc", or "combined", and pass an optional final beam-species argument as "numu" or "numubar". The matrix loop passes this from `ana/config/generator_loop_plan.tsv`, so FHC numubar and RHC numu rows use the matching species-specific NuMI flux histograms. The current generator-production strategy is flat in E_nu over 0-10 GeV, so the macros also apply a normalized NuMI flux reweight over that flat proposal range. Optional final arguments can override the proposal range, for example `..., "fhc", 0.0, 10.0, "numu"`.
 
 Outputs:
 
@@ -41,6 +170,34 @@ analysis/output/overlay_*.pdf
 analysis/output/map_*.pdf
 analysis/output/topology_yields.csv
 analysis/output/topology_yields_uncertainties.csv
+analysis/output/matrix/generator_matrix_status.csv
+analysis/output/expected_event_yields/expected_event_yields_by_variation.csv
+analysis/output/expected_event_yields/expected_event_yields_uncertainties.csv
+analysis/output/expected_event_yields/expected_event_yields_uncertainties_all_variations.csv
+analysis/output/expected_event_yields/expected_event_yields_generator_envelope_fixed_fsi.csv
+analysis/output/expected_event_yields/expected_event_yields_generator_envelope.csv
+analysis/output/expected_event_yields/expected_event_yields_summary.md
+analysis/output/phenomenology_sensitivity/*_summary.tsv
+analysis/output/phenomenology_sensitivity/*_members.tsv
+analysis/output/phenomenology_sensitivity/*_axes.tsv
+analysis/output/phenomenology_sensitivity/*_README.txt
+analysis/output/beam_kinematic_envelope/beam_kinematic_envelope_summary.csv
+analysis/output/beam_kinematic_envelope/beam_envelope_*.csv
+analysis/output/beam_kinematic_envelope/beam_envelope_*.pdf
+analysis/output/beam_kinematic_envelope/beam_envelope_*.png
+analysis/output/generator_kinematic_envelope/generator_kinematic_envelope_summary.csv
+analysis/output/generator_kinematic_envelope/generator_envelope_*.csv
+analysis/output/generator_kinematic_envelope/generator_envelope_*.pdf
+analysis/output/generator_kinematic_envelope/generator_envelope_*.png
+analysis/output/matrix/plots/<primary_or_exit>/<comparison_loop>/*.pdf
+analysis/output/matrix/plots/<primary_or_exit>/<comparison_loop>/*.png
+analysis/output/matrix/plots/<primary_or_exit>/maps/*.pdf
+analysis/output/matrix/plots/<primary_or_exit>/maps/*.png
+analysis/output/coverage/<comparison_loop>/coverage_*.pdf
+analysis/output/coverage/<comparison_loop>/coverage_*.png
+analysis/output/coverage/detector_visibility/detector_visibility_coverage_assumptions.tsv
+analysis/output/coverage/detector_visibility/<assumption>/<comparison_loop>/coverage_*.pdf
+analysis/output/coverage/detector_visibility/<assumption>/<comparison_loop>/coverage_*.png
 analysis/output/primary_mechanism_<sample_label>_<beam_polarity>.root
 analysis/output/primary_mechanism_<sample_label>_<beam_polarity>_summary.csv
 analysis/output/primary_mechanism_<sample_label>_<beam_polarity>_origin_mode.csv
@@ -52,8 +209,8 @@ analysis/output/nuclear_exit_<sample_label>_<beam_polarity>_raw_exit_pdg.csv
 
 This is a first pass over NUISANCE FlatTree_VARS. It uses pdg_vert for primary strange content, final state pdg for final Lambda content, and a p plus pi-minus proxy requiring primary or final hyperon evidence for S0.
 
-The primary mechanism macro keeps the Lambda-topology sample inclusive, then reports the selected sample by primary strange origin and generator Mode category with sample, generator, knob, beam_polarity, and statistical uncertainty columns. It first restricts all reported counts and spectra to the selected non-zero MicroBooNE NuMI flux envelope; it refuses to run if it cannot load that envelope or the sample has no Enu_true branch. If reduced topology flags such as topology_nominal_flag or fiducial_vertex_flag are not present, it falls back to a FlatTree proxy requiring final-state Lambda plus visible-proxy proton and pi-minus, and prints that caveat in the ROOT metadata and terminal output.
+The primary mechanism macro keeps the Lambda-topology sample inclusive, then reports the selected sample by primary strange origin and generator Mode category with sample, generator, knob, beam_polarity, and statistical uncertainty columns. It first restricts all reported counts and spectra to the selected non-zero MicroBooNE NuMI flux envelope and multiplies event weights by the selected NuMI flux histogram divided by its mean bin content over the flat proposal range. It refuses to run if it cannot load that envelope or the sample has no Enu_true branch. If reduced topology flags such as topology_nominal_flag or fiducial_vertex_flag are not present, it falls back to a FlatTree proxy requiring final-state Lambda plus visible-proxy proton and pi-minus, and prints that caveat in the ROOT metadata and terminal output.
 
-The nuclear-exit macro also restricts all reported counts and spectra to the selected non-zero MicroBooNE NuMI flux envelope and writes sample, generator, knob, and beam_polarity columns. It requires explicit Stage B branches such as n_exitp plus pdg_exit, or nuclear_exit_n plus nuclear_exit_pdg, and it refuses to use final-state pdg as a nuclear-exit proxy.
+The nuclear-exit macro uses the same flat-proposal NuMI flux reweight and writes sample, generator, knob, and beam_polarity columns. It requires explicit Stage B branches such as n_exitp plus pdg_exit, or nuclear_exit_n plus nuclear_exit_pdg, and it refuses to use final-state pdg as a nuclear-exit proxy.
 
 The detached Lambda topology still needs the reduced ntuple fields from CONTEXT: nuclear-exit strange species, Lambda decay vertex, daughter ancestry, fiducial flags, decay length, and truth-visible containment flags.

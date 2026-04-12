@@ -9,7 +9,8 @@
 !------------------------------------------------------------------------------
 ! DON'T  FORGET to change  "path_to_input" in the namelist &input according to your local GiBUU installation
 !------------------------------------------------------------------------------
-! This jobcard is set up for SBND flux, to use another flux change "nuExp" in the namelist &neutrino_induced
+! This jobcard is set up for a generated flat 0-10 GeV proposal flux.
+! Change "nuExp" and "FileNameFlux" in &neutrino_induced for another proposal.
 !------------------------------------------------------------------------------
 ! In this jobcard some of the analysis is switched OFF, see namelist &neutrinoAnalysis;
 ! the output of final events and particles in each event is given to the file FinalEvents.dat
@@ -78,14 +79,14 @@
 !       nuExp           = 18 ! 18: NOMAD
 !       nuExp           = 19 ! 19: BNB nue
 !       nuExp           = 20 ! 10: BNB nuebar
-       nuExp           = 21 ! 21: BNB numu
+!       nuExp           = 21 ! 21: BNB numu
 !       nuExp           = 22 ! 22: BNB numubar
 !       nuExp           = 23 ! NOvA ND    !various modes for near detector 
 !       nuExp           = 24 ! T2K on axis beam (INGRID)
 !       nuExp           = 25 ! 25: MINERvA new 2016 flux
-!       nuExp           = 99 ! new, own flux
-                             ! name of the flux file is given in the next line: 
-        FileNameFlux = '~/GiBUU/buuinput/neutrino/MINERvA_MEflux.dat'
+       nuExp           = 99 ! new, own flux
+                             ! name of the flux file is given in the next line:
+        FileNameFlux = './numi/flux/flat_0_10gev_5mev.dat'
                              ! for nuExp=99
                              ! this is an example for the MINERvA medium energy
                              ! flux, but any other flux could be inserted here

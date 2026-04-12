@@ -38,7 +38,11 @@ struct flux_envelope {
     bool active = false;
     double emin = 0.0;
     double emax = 0.0;
+    double proposal_emin = 0.0;
+    double proposal_emax = 10.0;
+    double mean_bin_flux = 1.0;
     TString source;
+    std::vector<TH1*> hists;
 };
 
 struct stage {
@@ -146,12 +150,53 @@ TString normalize_beam_polarity(TString beam_polarity)
     return "";
 }
 
-std::vector<TString> flux_hist_names(const TString& beam_polarity)
+TString normalize_beam_species(TString beam_species)
 {
-    if (beam_polarity == "fhc") return {"numu_CV_AV_TPC_5MeV_bin"};
-    if (beam_polarity == "rhc") return {"numubar_CV_AV_TPC_5MeV_bin"};
-    if (beam_polarity == "combined") return {"numu_CV_AV_TPC_5MeV_bin", "numubar_CV_AV_TPC_5MeV_bin"};
-    return {};
+    beam_species.ToLower();
+    if (beam_species == "" || beam_species == "combined" || beam_species == "both" ||
+        beam_species == "all") return "";
+    if (beam_species == "numu" || beam_species == "nu_mu" || beam_species == "14") return "numu";
+    if (beam_species == "numubar" || beam_species == "anti_numu" || beam_species == "-14") return "numubar";
+    return beam_species;
+}
+
+TString flux_hist_path(const TString& beam_polarity, const TString& beam_species)
+{
+    TString path = beam_polarity;
+    path += "/";
+    path += beam_species;
+    path += "/Detsmear/";
+    path += (beam_species == "numubar" ? "numubar_CV_AV_TPC_5MeV_bin" : "numu_CV_AV_TPC_5MeV_bin");
+    return path;
+}
+
+TString hist_leaf_name(TString path)
+{
+    const Ssiz_t slash = path.Last('/');
+    return slash < 0 ? path : path(slash + 1, path.Length() - slash - 1);
+}
+
+std::vector<TString> flux_hist_paths(const TString& beam_polarity, TString beam_species)
+{
+    beam_species = normalize_beam_species(beam_species);
+    std::vector<TString> paths;
+    auto add = [&](const TString& polarity, const TString& species) {
+        paths.push_back(flux_hist_path(polarity, species));
+    };
+    if (beam_polarity == "combined") {
+        if (beam_species == "") {
+            add("fhc", "numu");
+            add("fhc", "numubar");
+            add("rhc", "numu");
+            add("rhc", "numubar");
+        } else {
+            add("fhc", beam_species);
+            add("rhc", beam_species);
+        }
+    } else if (beam_polarity == "fhc" || beam_polarity == "rhc") {
+        add(beam_polarity, beam_species == "" ? (beam_polarity == "rhc" ? "numubar" : "numu") : beam_species);
+    }
+    return paths;
 }
 
 TString infer_generator(TString sample)
@@ -315,6 +360,12 @@ TH1* find_hist(TDirectory* dir, const TString& name)
     return nullptr;
 }
 
+TH1* find_flux_hist(TFile* file, const TString& path)
+{
+    TH1* hist = dynamic_cast<TH1*>(file->Get(path));
+    return hist ? hist : find_hist(file, hist_leaf_name(path));
+}
+
 bool extend_flux(TH1* hist, double floor_fraction, flux_envelope& env)
 {
     if (!hist || hist->GetMaximum() <= 0.0) return false;
@@ -331,15 +382,36 @@ bool extend_flux(TH1* hist, double floor_fraction, flux_envelope& env)
         found = true;
     }
     if (!found) return false;
+    TH1* clone = static_cast<TH1*>(hist->Clone(TString::Format("%s_flat_proposal_reweight_%d", hist->GetName(), int(env.hists.size()))));
+    clone->SetDirectory(nullptr);
+    env.hists.push_back(clone);
     env.emin = env.active ? std::min(env.emin, emin) : emin;
     env.emax = env.active ? std::max(env.emax, emax) : emax;
     env.active = true;
     return true;
 }
 
-flux_envelope read_flux(TString path, TString beam_polarity, double floor_fraction)
+double mean_flux_in_proposal(const flux_envelope& env)
+{
+    double total = 0.0;
+    int bins = 0;
+    for (TH1* hist : env.hists) {
+        for (int bin = 1; bin <= hist->GetNbinsX(); ++bin) {
+            const double center = hist->GetXaxis()->GetBinCenter(bin);
+            if (center < env.proposal_emin || center >= env.proposal_emax) continue;
+            total += std::max(0.0, hist->GetBinContent(bin));
+            ++bins;
+        }
+    }
+    return bins > 0 && !env.hists.empty() ? total / (double(bins) / double(env.hists.size())) : 0.0;
+}
+
+flux_envelope read_flux(TString path, TString beam_polarity, TString beam_species, double floor_fraction,
+                        double proposal_emin, double proposal_emax)
 {
     flux_envelope env;
+    env.proposal_emin = proposal_emin;
+    env.proposal_emax = proposal_emax;
     beam_polarity = normalize_beam_polarity(beam_polarity);
     if (beam_polarity == "") {
         std::cerr << "Beam polarity must be FHC, RHC, or combined." << std::endl;
@@ -351,15 +423,24 @@ flux_envelope read_flux(TString path, TString beam_polarity, double floor_fracti
         return env;
     }
     std::vector<TString> used;
-    const std::vector<TString> names = flux_hist_names(beam_polarity);
+    const std::vector<TString> names = flux_hist_paths(beam_polarity, beam_species);
     for (const TString& name : names) {
-        if (extend_flux(find_hist(file, name), floor_fraction, env)) used.push_back(name);
+        if (extend_flux(find_flux_hist(file, name), floor_fraction, env)) used.push_back(name);
         else std::cerr << "Could not use NuMI flux histogram: " << name.Data() << std::endl;
     }
     file->Close();
     if (!env.active || env.emax <= env.emin) {
         env.active = false;
         std::cerr << "No valid non-zero NuMI flux support was found in " << path.Data() << std::endl;
+        return env;
+    }
+    env.emin = std::max(env.emin, env.proposal_emin);
+    env.emax = std::min(env.emax, env.proposal_emax);
+    env.mean_bin_flux = mean_flux_in_proposal(env);
+    if (env.emax <= env.emin || env.mean_bin_flux <= 0.0) {
+        env.active = false;
+        std::cerr << "No valid NuMI flux overlap with flat proposal range "
+                  << env.proposal_emin << " to " << env.proposal_emax << " GeV." << std::endl;
         return env;
     }
     env.source = path;
@@ -377,6 +458,18 @@ flux_envelope read_flux(TString path, TString beam_polarity, double floor_fracti
 bool in_flux(const flux_envelope& env, double enu)
 {
     return env.active && enu >= env.emin && enu <= env.emax;
+}
+
+double flux_reweight(const flux_envelope& env, double enu)
+{
+    if (!in_flux(env, enu) || env.mean_bin_flux <= 0.0) return 0.0;
+    double flux = 0.0;
+    for (TH1* hist : env.hists) {
+        const int bin = hist->FindBin(enu);
+        if (bin < 1 || bin > hist->GetNbinsX()) continue;
+        flux += std::max(0.0, hist->GetBinContent(bin));
+    }
+    return flux / env.mean_bin_flux;
 }
 
 void scale_density(TH1D* hist)
@@ -474,7 +567,10 @@ void nuclear_exit(
     TString knob = "",
     TString flux_file = "example/numi/flux/microboone_numi_flux_5mev.root",
     double flux_floor_fraction = 0.0,
-    TString beam_polarity = "combined"
+    TString beam_polarity = "combined",
+    double proposal_emin_gev = 0.0,
+    double proposal_emax_gev = 10.0,
+    TString beam_species = ""
 )
 {
     if (sample_label == "") sample_label = gSystem->BaseName(input_file.Data());
@@ -509,7 +605,9 @@ void nuclear_exit(
         return;
     }
 
-    const flux_envelope flux = read_flux(flux_file, beam_polarity, flux_floor_fraction);
+    beam_species = normalize_beam_species(beam_species);
+    const flux_envelope flux = read_flux(flux_file, beam_polarity, beam_species, flux_floor_fraction,
+                                         proposal_emin_gev, proposal_emax_gev);
     if (!flux.active) {
         std::cerr << "Refusing to make nuclear-exit summaries without a NuMI flux envelope." << std::endl;
         input->Close();
@@ -600,7 +698,7 @@ void nuclear_exit(
         if (!in_flux(flux, enu_gev)) continue;
         ++entries_in_flux;
 
-        const double evt_w = value(weight, 0, 1.0) * value(scale, 0, 1.0);
+        const double evt_w = value(weight, 0, 1.0) * value(scale, 0, 1.0) * flux_reweight(flux, enu_gev);
         const double xsec_w = evt_w * std::max(1, int_value(target_a, 0, int(default_argon_a))) * units;
         const strange_counts p = read_strange(primary);
         const strange_counts x = read_strange(exit);
@@ -703,12 +801,20 @@ void nuclear_exit(
     note += knob;
     note += "; beam_polarity=";
     note += beam_polarity;
+    note += "; beam_species=";
+    note += beam_species == "" ? "default" : beam_species;
     note += "; numi_flux_source=";
     note += flux.source;
     note += "; numi_flux_emin_GeV=";
     note += TString::Format("%.8g", flux.emin);
     note += "; numi_flux_emax_GeV=";
     note += TString::Format("%.8g", flux.emax);
+    note += "; flat_proposal_emin_GeV=";
+    note += TString::Format("%.8g", flux.proposal_emin);
+    note += "; flat_proposal_emax_GeV=";
+    note += TString::Format("%.8g", flux.proposal_emax);
+    note += "; numi_flux_reweight_mean_bin_flux=";
+    note += TString::Format("%.8g", flux.mean_bin_flux);
     note += "; final_state_pdg_not_used_as_exit_proxy=true";
     TNamed("nuclear_exit_metadata", note).Write();
     h_cutflow.Write();

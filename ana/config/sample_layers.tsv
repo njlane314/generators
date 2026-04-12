@@ -1,0 +1,6 @@
+layer	name	input	output	notes
+0	flux_assets	MicroBooNE NuMI FHC/RHC flux files	beam weights and flux metadata	Freeze before generator comparisons.
+1	topology_gun_envelope	flat or importance-sampled Lambda -> p pi- throws	A_det(y) and Omega_det	This is the detector-envelope source.
+2	hyperon_final_state_generator_projection	NuWro/GENIE argon reduced ntuples with any final-state PDG in {3122,3212,3322,3312,3334}; no momentum cut	conditional maps in fixed y bins	Main detector-facing generator projection.
+3	mechanism_controls	direct Lambda, Sigma0, charged-Sigma, associated-K, charm controls	ancestry and systematic cross-checks	Controls do not define the signal.
+4	targeted_oversamples	high-uncertainty accepted bins or high-W/charm requests	weighted supplemental generator samples	Use only with explicit provenance and weights.

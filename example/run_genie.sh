@@ -11,8 +11,9 @@ export interaction="CC"
 export minE="0."
 export maxE="10."
 
-export fluxfile="./sbnd_flux.root";export fluxhisto="flux_sbnd_numu"
-#export fluxfile="./MCC9_FluxHist_volTPCActive.root";export fluxhisto="hEnumu_cv"
+export reweight_fluxfile="./numi/flux/microboone_numi_flux_5mev.root"
+export reweight_fluxhisto="fhc/numu/Detsmear/numu_CV_AV_TPC_5MeV_bin"
+# Reweight target for downstream analysis; not passed to gevgen.
 
 export outdir="./samples"
 
@@ -23,13 +24,13 @@ export outdir="./samples"
 gspl2root -f ${outdir}/${probe}_${target}_${interaction}_${version}_${tune}.xml --event-generator-list ${interaction} -p ${probe} -t ${target} -o ${outdir}/${probe}_${target}_${interaction}_${version}_${tune}.xml.root --tune ${tune}
 
 # Generate GENIE events
-gevgen -n $events -p ${probe} -t ${target} -e ${minE},${maxE}  --event-generator-list ${interaction} --tune ${tune} --cross-sections ${outdir}/${probe}_${target}_${interaction}_${version}_${tune}.xml -f ${fluxfile},${fluxhisto} -o ${outdir}/${probe}_${target}_${interaction}_${version}_${tune}.ghep.root
+gevgen -n $events -p ${probe} -t ${target} -e ${minE},${maxE}  --event-generator-list ${interaction} --tune ${tune} --cross-sections ${outdir}/${probe}_${target}_${interaction}_${version}_${tune}.xml -o ${outdir}/${probe}_${target}_${interaction}_${version}_${tune}.ghep.root
 
 # Convert file from ghep to gst
 gntpc -f gst -i ${outdir}/${probe}_${target}_${interaction}_${version}_${tune}.ghep.root -o ${outdir}/${probe}_${target}_${interaction}_${version}_${tune}.gst.root --tune ${tune}
 
 # Convert file from ghep to nuisance format
-PrepareGENIE -i ${outdir}/${probe}_${target}_${interaction}_${version}_${tune}.ghep.root -t ${target}[1] -o ${outdir}/${probe}_${target}_${interaction}_${version}_${tune}.gprep.root -f ${fluxfile},${fluxhisto}
+PrepareGENIE -i ${outdir}/${probe}_${target}_${interaction}_${version}_${tune}.ghep.root -t ${target}[1] -o ${outdir}/${probe}_${target}_${interaction}_${version}_${tune}.gprep.root
 
 # Convert to nuisance flat tree format
 nuisflat -i GENIE:${outdir}/${probe}_${target}_${interaction}_${version}_${tune}.gprep.root -o ${outdir}/${probe}_${target}_${interaction}_${version}_${tune}.flat.root
