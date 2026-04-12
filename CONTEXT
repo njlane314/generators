@@ -1,0 +1,738 @@
+
+MicroBooNE NuMI Lambda final-state study context
+================================================
+
+Purpose
+-------
+
+This file records the current analysis plan for a generator-level and
+detector-facing study of Lambda final states in MicroBooNE under the NuMI
+off-axis flux.  It is intended to live in the repository as plain-text
+context for humans and LLMs.
+
+The study is explicitly NOT framed as a DUNE overlap note.  The primary
+goal is to understand production coverage, final-state composition, and
+truth-level detector coverage for Lambda-bearing events in MicroBooNE.
+A secondary, optional goal is a geometry-only comparison with SBND using
+the same truth definitions.
+
+Core analysis stance
+--------------------
+
+There are two coupled but distinct objects:
+
+  (1) Physics / mechanism study:
+      What produces a final-state Lambda on argon, and how much of the
+      observed Lambda population comes from direct Lambda production,
+      Sigma0 -> Lambda gamma feed-through, charged-Sigma exchange, or
+      other strange channels?
+
+  (2) Detector-facing measurement:
+      What MicroBooNE can actually measure is a fiducial detached-Lambda
+      topology, namely a neutrino interaction in the fiducial volume with
+      a visible Lambda -> p pi- decay topology in the active detector,
+      optionally with a CC muon tag.
+
+The measurement should be defined by (2).  The decomposition into direct
+Lambda, Sigma feed-through, associated kaon production, and higher-mass
+hyperon channels is a model-dependent interpretation layered on top of
+that measurement.
+
+This is the key design choice.  Do not make the detector-facing signal
+equal to "direct anti-nu_mu N -> mu+ Lambda".  That is a theory channel,
+not a robust detector observable.
+
+Scope
+-----
+
+Main scope:
+
+  * final-state Lambda production in MicroBooNE under the NuMI beam;
+  * generator-level production coverage;
+  * hyperon ancestry and migration through FSI;
+  * truth-level detector observability of Lambda -> p pi- topologies;
+  * inclusive detector-facing Lambda topology categories.
+
+Optional scope:
+
+  * SBND comparison using the same post-FSI truth sample and the same
+    truth-visible topology rules, with only the detector geometry changed;
+  * GiBUU or NEUT cross-checks beyond the main NuWro/GENIE pair;
+  * later full-reconstruction studies after the truth-level design is
+    frozen.
+
+Non-goals for the first pass:
+
+  * no DUNE overlap study in the main analysis;
+  * no attempt to publish a generator-independent extraction of direct
+    Lambda or Sigma cross sections from the topology measurement alone;
+  * no reliance on reconstruction-specific fake-topology estimates in the
+    generator-only stage.
+
+Canonical observable definitions
+--------------------------------
+
+Use four truth stages.  They must stay distinct in the ntuples and in the
+plots.
+
+  Stage A: primary strange production
+      The strange baryon species at the neutrino interaction vertex,
+      before intranuclear transport and before prompt decays.
+
+  Stage B: strange baryon at nuclear exit
+      The strange baryon species after FSI and after intranuclear
+      transport, but before detector-medium propagation.
+
+  Stage C: post-decay state in detector medium
+      The Lambda decay position and daughters after propagation in liquid
+      argon, before any reconstruction selection.
+
+  Stage D: truth-visible topology
+      A truth-level tag for whether the event contains a visible detached
+      Lambda -> p pi- topology in the MicroBooNE active volume.
+
+Important consequence:
+
+  Sigma0 feed-through is a Stage A composition issue.
+  Charged-Sigma exchange is a Stage A -> Stage B migration issue.
+  Lambda acceptance is a Stage B/C -> Stage D issue.
+
+Headline detector-facing signal
+-------------------------------
+
+Define the headline signal as:
+
+  "inclusive fiducial Lambda topology"
+
+meaning:
+
+  * neutrino interaction vertex in the fiducial volume;
+  * at least one true Lambda is present after transport;
+  * a Lambda decays as Lambda -> p pi- in or near the active volume;
+  * the daughter proton and pion satisfy truth-visible conditions.
+
+This signal is inclusive in origin.  It includes:
+
+  * direct Lambda production;
+  * Sigma0 -> Lambda gamma feed-through;
+  * Sigma+/-/0 -> Lambda through FSI or exchange;
+  * associated K Y production if it ends in a visible Lambda topology;
+  * higher-mass hyperon or Y pi contributions if they yield a visible
+    Lambda.
+
+This signal does NOT include:
+
+  * events with no true Lambda that only fake a detached p pi- topology;
+  * reconstruction-specific failures or false positives unless a later
+    full detector/reco study is added.
+
+Subchannels to define from the same truth sample
+------------------------------------------------
+
+The same inclusive truth sample should support multiple detector-facing
+categories.  At minimum define:
+
+  S0: inclusive Lambda topology
+      No requirement on visible muon, kaon, gamma, or extra activity.
+
+  S1: CC-tagged Lambda topology
+      Same as S0, plus a visible muon candidate at truth level.
+
+  S2: Lambda topology + visible kaon
+      Same as S0, plus a visible final-state kaon tag.  This is the most
+      direct detector handle on associated K Y production.
+
+  S3: Lambda topology + low extra activity
+      Same as S0, but with little additional visible hadronic activity.
+      This is a QE-like control region, not the main inclusive signal.
+
+  S4: Lambda topology + visible EM companion
+      Same as S0, plus visible gamma or EM activity compatible with
+      Sigma0 feed-through.  This is useful as an interpretation category,
+      but should not be required by the headline signal.
+
+  S5: Lambda topology with no visible muon
+      NC-enriched or low-muon-visibility category.
+
+Do NOT define "no showers" or "low extra activity" as part of the main
+inclusive Lambda-topology signal.  Those requirements are useful for a
+QE-like subsample, but they bias against visible Sigma0 gamma activity and
+against associated production.
+
+Physics decomposition to preserve in all samples
+------------------------------------------------
+
+Every event that reaches Stage D should carry an origin label.  Use a
+small, explicit ancestry vocabulary rather than generator-specific process
+IDs.  Recommended origin classes:
+
+  O0  direct_Lambda
+      Primary Lambda at the interaction vertex.
+
+  O1  Sigma0_feedthrough
+      Primary Sigma0 that becomes Lambda via Sigma0 -> Lambda gamma.
+
+  O2  charged_Sigma_exchange
+      Primary Sigma+ or Sigma- whose transport and/or exchange ends in a
+      final-state Lambda.
+
+  O3  neutral_Sigma_exchange
+      Primary Sigma0 or Sigma-like state whose transport contributes to a
+      final-state Lambda outside the simple prompt-decay feed-through.
+
+  O4  associated_KY
+      Primary associated kaon + hyperon production with final Lambda
+      topology.
+
+  O5  inelastic_hyperon_or_Ypi
+      Higher-mass hyperon, Y pi, or inelastic strange channels that end in
+      a visible Lambda topology.
+
+  O6  other_strange
+      Any other strange ancestry that yields a final visible Lambda.
+
+  O7  no_true_Lambda
+      Background class used only after reconstruction studies are added.
+
+In practice, O1, O2, O4, and O5 are the load-bearing categories.
+
+Core equations
+--------------
+
+For any phase-space point x, define:
+
+  S_FSI(x)   = N_exit(x) / N_primary(x)
+  A_topo(x)  = N_visible(x) / N_exit_or_postdecay(x)
+
+where:
+
+  N_primary      = Stage A yield,
+  N_exit         = Stage B yield,
+  N_visible      = Stage D yield.
+
+For the inclusive detector-facing signal:
+
+  N_visible_Lambda_topology
+    = sum over origins o of
+      N_primary(o) *
+      P(Lambda at exit | o) *
+      P(visible Lambda -> p pi- topology | exit, geometry) *
+      A_topo
+
+This factorization is conceptual.  The analysis should estimate the
+factors from event records, not impose a hard analytic model.
+
+Samples required
+----------------
+
+The sample plan has three layers:
+
+  Layer 0: flux assets
+  Layer 1: mechanism-control generator samples
+  Layer 2: inclusive topology generator samples
+
+Layer 0: flux assets
+--------------------
+
+Freeze the MicroBooNE NuMI flux inputs first.  Use:
+
+  * updated MicroBooNE NuMI FHC flux histogram;
+  * updated MicroBooNE NuMI RHC flux histogram;
+  * a flat-in-E generation configuration plus beam reweighting to FHC/RHC.
+
+Reason: rare strange channels are too expensive to generate directly with
+beam-thrown spectra if the only goal is phase-space coverage and topology
+fractions.  Flat-in-E generation with later flux weighting is more
+efficient and separates production from beam shape.
+
+Layer 1: mechanism-control samples
+----------------------------------
+
+These samples isolate direct Lambda, Sigma0 feed-through, and charged-
+Sigma exchange.  They are the interpretation backbone, not the headline
+measurement sample.
+
+Mandatory NuWro controls:
+
+  NW-DIR-numubar-p-na-flatE
+      anti-nu_mu on free proton, flat E.
+      Purpose: direct Lambda and Sigma0 production on proton.
+
+  NW-DIR-numubar-n-na-flatE
+      anti-nu_mu on free neutron, flat E.
+      Purpose: Sigma- production on neutron.
+
+  NW-DIR-numubar-Ar-off-flatE
+      anti-nu_mu on argon, FSI off, flat E.
+      Purpose: isolate nuclear initial-state effects without hyperon FSI.
+
+  NW-DIR-numubar-Ar-on-flatE
+      anti-nu_mu on argon, FSI on, flat E.
+      Purpose: nominal direct-hyperon + transport sample.
+
+Recommended NuWro variations:
+
+  NW-DIR-numubar-Ar-on-flatE-potOff
+      Hyperon potential off.
+
+  NW-DIR-numubar-Ar-on-flatE-MAlo
+      Lower axial-mass or relevant form-factor variant.
+
+  NW-DIR-numubar-Ar-on-flatE-MAhi
+      Higher axial-mass or relevant form-factor variant.
+
+Optional if statistics permit:
+
+  NW-DIR-numu-Ar-on-flatE
+      nu_mu on argon, FSI on, flat E.
+      Purpose: cross-check channels that populate Lambda through neutrino-
+      induced associated production in the same framework.
+
+Matching GENIE controls:
+
+  GN-DIR-numubar-p-na-flatE
+  GN-DIR-numubar-n-na-flatE
+  GN-DIR-numubar-Ar-na-flatE
+
+GENIE is not the nominal transport model for Sigma -> Lambda migration,
+but it is the main production baseline and a necessary comparison point.
+
+Optional GiBUU control:
+
+  GB-DIR-numubar-Ar-na-flatE
+      A transport-theory cross-check if available.
+
+Layer 2: inclusive topology samples
+-----------------------------------
+
+These are the main measurement samples.  Generate all processes on argon,
+then classify offline by ancestry and visible topology.
+
+Mandatory inclusive samples:
+
+  NW-INCL-numu-Ar-on-flatE
+  NW-INCL-numubar-Ar-on-flatE
+  GN-INCL-numu-Ar-na-flatE
+  GN-INCL-numubar-Ar-na-flatE
+
+Optional low-priority samples:
+
+  NW-INCL-nue-Ar-on-flatE
+  NW-INCL-nuebar-Ar-on-flatE
+  GN-INCL-nue-Ar-na-flatE
+  GN-INCL-nuebar-Ar-na-flatE
+
+Rationale:
+
+  * numu and numubar are mandatory because the detector-facing Lambda
+    topology is not restricted to the direct anti-nu hyperon sector;
+  * numu flux contributes through associated kaon + hyperon production and
+    other final-state Lambda channels;
+  * electron-flavor samples are likely subleading in NuMI but can be added
+    later for completeness if needed.
+
+Beam-weighted derived views
+---------------------------
+
+Do not generate separate beam-thrown files at first.  Instead derive:
+
+  * FHC-weighted predictions from flat-E inclusive and control samples;
+  * RHC-weighted predictions from flat-E inclusive and control samples.
+
+This gives one common truth library with two beam projections.
+
+Optional SBND geometry comparison
+---------------------------------
+
+If an SBND comparison is added, do not generate a separate physics sample.
+Reuse the same post-FSI, post-decay truth records and apply the same
+truth-visible topology rules in an SBND geometry pass.  Otherwise beam
+differences and generator composition get mixed with the geometry effect.
+
+Generator strategy
+------------------
+
+Nominal generator pair:
+
+  * NuWro: nominal model for hyperon ancestry and Sigma -> Lambda
+    migration;
+  * GENIE: main production baseline and comparison point.
+
+Why this pair:
+
+  * NuWro is the one to trust first for hyperon transport studies,
+    especially charged-Sigma exchange and Lambda enhancement from FSI;
+  * GENIE remains essential for a production-level baseline and for
+    understanding how sensitive the decomposition is to generator choice.
+
+Optional cross-check generators:
+
+  * GiBUU: transport-theory cross-check;
+  * NEUT: later appendix after local verification of the relevant hyperon
+    implementation.
+
+Repository and build strategy
+-----------------------------
+
+A repository such as BuildEventGenerators is a good bootstrap, but it must
+be modified for this analysis.  The minimum required changes are:
+
+  * pin every generator version explicitly;
+  * replace older MicroBooNE flux files with the updated NuMI flux assets;
+  * add jobcards for free p, free n, argon FSI off, and argon FSI on;
+  * preserve Sigma0 ancestry before automatic decays;
+  * export a common reduced ntuple with ancestry fields;
+  * support flat-E generation plus later FHC/RHC weighting.
+
+Do not rely on "latest master" for NuWro or any other generator.  Use a
+known tag or commit hash and record it in the repo.
+
+Recommended sample naming convention
+------------------------------------
+
+Use a machine-readable sample name with fixed fields:
+
+  [GEN]-[FAM]-[FLAVOR]-[TARGET]-[FSI]-[SPEC]-[VARIANT]
+
+where:
+
+  GEN      = NW, GN, GB, NT
+  FAM      = DIR, INCL, TOPO, GEOM
+  FLAVOR   = numu, numubar, nue, nuebar
+  TARGET   = p, n, Ar
+  FSI      = na, off, on
+  SPEC     = flatE, FHCw, RHCw
+  VARIANT  = nom, potOff, MAlo, MAhi, loose, nominal, tight, etc.
+
+Examples:
+
+  NW-DIR-numubar-Ar-on-flatE-nom
+  GN-INCL-numu-Ar-na-flatE-nom
+  NW-TOPO-numubar-Ar-on-FHCw-nominal
+  NW-GEOM-numubar-Ar-on-FHCw-SBND-nominal
+
+Truth record / reduced ntuple contract
+--------------------------------------
+
+The reduced ntuple is more important than the raw generator trees.  Every
+analysis stage should write the same core fields.
+
+Event identity and weights:
+
+  * run, subrun, event;
+  * generator name and version;
+  * flux mode weight: flatE, FHC weight, RHC weight;
+  * incoming neutrino PDG and energy.
+
+Interaction-level kinematics:
+
+  * E_nu;
+  * Q2;
+  * W;
+  * x_Bj, y if available;
+  * target nucleon / nucleus code;
+  * interaction category label if available.
+
+Primary strange ancestry:
+
+  * primary strange baryon species before prompt decay;
+  * primary kaon content;
+  * primary associated-hyperon flags;
+  * origin class O0..O7.
+
+Nuclear-exit state:
+
+  * strange baryon species at nuclear exit;
+  * kaon species at nuclear exit;
+  * extra nucleon multiplicities and kinetic energies;
+  * extra pion multiplicities.
+
+Detector-medium / post-decay state:
+
+  * Lambda four-vector at exit or before decay;
+  * Lambda decay vertex (x, y, z);
+  * Lambda decay length and proper lifetime proxy if available;
+  * daughter proton four-vector;
+  * daughter pion four-vector;
+  * daughter opening angle;
+  * pointing angle of the Lambda candidate back to the neutrino vertex;
+  * Sigma0 gamma four-vector if the parent was Sigma0;
+  * visible kaon companion four-vectors;
+  * visible EM companion flags;
+  * extra visible energy estimate.
+
+Truth-visible tags:
+
+  * fiducial_vertex_flag;
+  * lambda_decays_in_active_flag;
+  * proton_visible_flag;
+  * pion_visible_flag;
+  * detached_vertex_flag;
+  * visible_muon_flag;
+  * visible_kaon_flag;
+  * visible_gamma_flag;
+  * low_extra_activity_flag;
+  * topology_loose_flag;
+  * topology_nominal_flag;
+  * topology_tight_flag.
+
+Ancestry-preservation rules
+---------------------------
+
+These rules are mandatory.  If they are violated, the analysis becomes
+ambiguous.
+
+  * Preserve the primary Sigma0 label before automatic Sigma0 -> Lambda
+    gamma decay.  Otherwise Sigma0 feed-through is lost.
+  * Preserve the primary Sigma+/- label before transport.  Otherwise
+    charged-Sigma exchange cannot be measured.
+  * Keep both primary and nuclear-exit strange-baryon species.
+  * Record kaon companions at both the primary vertex and detector-visible
+    stage.
+  * Do not trust generator process IDs alone to define origin classes.
+    Construct origin classes explicitly from ancestry.
+
+Truth-visible working points
+----------------------------
+
+Use three truth-visible working points derived from the same Stage C
+record.  This is better than one hard cut, because generator-level studies
+must acknowledge uncertainty in the final reconstruction thresholds.
+
+Loose working point:
+
+  * fiducial vertex;
+  * Lambda decays inside or very near active volume;
+  * daughter proton and pion are both nontrivial in visible range;
+  * minimal detached-vertex requirement.
+
+Nominal working point:
+
+  * fiducial vertex;
+  * Lambda decays inside active volume;
+  * daughter proton and pion each satisfy nominal visibility thresholds;
+  * detached vertex exceeds a nominal separation threshold;
+  * daughters have enough opening angle to support a V0-like topology.
+
+Tight working point:
+
+  * all nominal requirements;
+  * stronger daughter visibility thresholds;
+  * stronger displaced-vertex and opening-angle requirements;
+  * optionally stronger containment conditions.
+
+Practical rule:
+
+  start from daughter momentum or range thresholds that are consistent with
+  the published MicroBooNE Lambda restricted phase space, then map them to
+  truth-visible track-length proxies if needed.
+
+Axes and coverage variables
+---------------------------
+
+Do not center the note on (E_nu, Q2) alone.  Keep it as a secondary plane.
+For Lambda final states, the natural axes are hadron-centric.
+
+Production / mechanism planes:
+
+  * (E_nu, W)
+  * (Q2, W)
+  * (E_nu, primary strange species fraction)
+
+Final-state Lambda planes:
+
+  * (p_Lambda, cos(theta_Lambda))
+  * (T_Lambda or p_Lambda, decay length)
+  * (decay length, daughter opening angle)
+
+Topology / detector planes:
+
+  * (z_decay, r_decay) or x-z and y-z decay maps
+  * (p_p, p_pi) for daughter visibility
+  * (p_K, extra visible energy) for associated-production context
+  * (E_gamma, z_decay) or a simple gamma-visibility flag for Sigma0
+
+Each phase-space plane should support the same stage sequence:
+primary -> exit -> post-decay -> truth-visible.
+
+Plot plan and visual grammar
+----------------------------
+
+Baseline grammar to keep:
+
+  * normalized one-dimensional spectra;
+  * 70/90/99 percent coverage contours in key two-dimensional planes.
+
+Expanded grammar for this analysis:
+
+  A. Stage-contour overlays
+     Overlay 70/90/99 percent contours for Stages A, B, C, and D on the
+     same axes.  This shows what is lost or reshaped by transport and by
+     detector visibility.
+
+  B. Composition maps
+     In each accepted bin, show the fraction of O0, O1, O2, O4, O5, etc.
+     This directly answers "what makes up the visible Lambda topology?"
+
+  C. Origin-to-visible flow plots
+     Use a Sankey or migration matrix:
+       primary species -> exit species -> visible topology category
+
+  D. Acceptance maps
+     Plot A_topo(x) in hadron-centric planes such as
+       (p_Lambda, cos(theta_Lambda))
+       (decay length, daughter opening angle)
+
+  E. Lost-space maps
+     Plot f_final(x) * [1 - A_topo(x)] to identify where final-state Lambda
+     events are produced but not captured by the topology definition.
+
+  F. Geometry maps
+     x-z and y-z maps of true Lambda decay vertices, split by accepted and
+     failed events, to expose geometric acceptance and fiducial effects.
+
+  G. Companion-object panels
+     For visible Lambda-topology events, show the rates of visible kaon,
+     visible gamma / EM, and low-extra-activity categories.
+
+  H. Stratified cutflows
+     Waterfall or cutflow plots from Stage A to Stage D, split by origin
+     class.  This is the most compact way to show where each component is
+     lost.
+
+Encoding rules for readable figures
+-----------------------------------
+
+Use one visual encoding channel per concept:
+
+  * color       = origin class or detector category;
+  * line style  = stage (A, B, C, D);
+  * panel column = generator;
+  * panel row    = beam mode or truth-visible working point.
+
+Practical rules:
+
+  * do not put more than one filled density on the same panel;
+  * use contour-only overlays when multiple stages are shown together;
+  * keep axes identical across generators;
+  * annotate every panel with the same working point and beam weight;
+  * keep one legend vocabulary for all figures.
+
+Minimum figure set
+------------------
+
+A compact note can be built from the following figure families.
+
+  F1. 1D normalized spectra
+      E_nu, W, p_Lambda, decay length for Stages A/B/C/D.
+
+  F2. Stage coverage contours
+      (E_nu, W), (Q2, W), (p_Lambda, cos(theta_Lambda)),
+      (decay length, opening angle).
+
+  F3. Composition maps
+      Visible Lambda-topology composition by origin class.
+
+  F4. Acceptance maps
+      A_topo for loose, nominal, tight working points.
+
+  F5. Geometry maps
+      Decay-vertex maps for accepted vs failed events.
+
+  F6. Companion-object summaries
+      Fractions of visible kaon, visible gamma / EM, low extra activity,
+      CC-tagged muon, and no-visible-muon categories.
+
+  F7. Origin-flow plot
+      primary species -> exit species -> visible category.
+
+  F8. Cutflow
+      Stage A -> B -> C -> D, split by origin class and generator.
+
+Suggested visible categories for the flow plot
+----------------------------------------------
+
+Recommended visible-category labels:
+
+  V0  Lambda_topology_inclusive
+  V1  Lambda_topology_CCtag
+  V2  Lambda_topology_plus_Kvis
+  V3  Lambda_topology_plus_EMvis
+  V4  Lambda_topology_lowExtra
+  V5  Lambda_topology_noMuon
+  V6  final_Lambda_not_visible
+  V7  no_final_Lambda
+
+Workflow and priorities
+-----------------------
+
+Recommended order of work:
+
+  1. Freeze flux files and sample naming.
+  2. Build the reduced ntuple schema and ancestry rules first.
+  3. Generate the NuWro mechanism-control samples.
+  4. Generate the GENIE matching controls.
+  5. Generate the inclusive NuWro and GENIE argon samples.
+  6. Derive FHC and RHC weights from flat-E samples.
+  7. Build Stage A/B/C/D views and validate ancestry bookkeeping.
+  8. Define loose/nominal/tight topology working points.
+  9. Make the minimum figure set.
+ 10. Only then add SBND geometry comparison or GiBUU cross-checks.
+
+Why this order:
+
+  * without the reduced ntuple and ancestry labels, Sigma0 feed-through
+    and charged-Sigma exchange can disappear in the event record;
+  * without the inclusive samples, the detector-facing measurement is
+    overconstrained by the direct-hyperon interpretation;
+  * without flat-E weighting, rare-channel statistics are used badly.
+
+Interpretation rules
+--------------------
+
+The analysis should follow three simple rules.
+
+Rule 1:
+  The measurement is the inclusive fiducial Lambda topology.  Publish that
+  first.
+
+Rule 2:
+  Direct Lambda, Sigma0 feed-through, charged-Sigma exchange, associated
+  kaon production, and Y pi components are interpretation layers obtained
+  from generator ancestry.
+
+Rule 3:
+  Any statement about direct or Sigma-specific rates must be generator-
+  qualified.  Those components are model-dependent and should never be
+  presented as detector-level observables.
+
+LLM-oriented summary
+--------------------
+
+If an LLM reads only one page of context, it should recover the following
+facts:
+
+  * the analysis target is MicroBooNE NuMI final-state Lambda production;
+  * the main observable is an inclusive fiducial Lambda -> p pi- topology;
+  * the measurement is inclusive of associated-kaon production, Sigma0
+    feed-through, and charged-Sigma exchange;
+  * direct-vs-feed-through decomposition is interpretation, not signal;
+  * NuWro is the nominal hyperon-transport model;
+  * GENIE is the main production baseline;
+  * the key truth stages are primary, nuclear exit, post-decay, and
+    truth-visible;
+  * the required samples are mechanism-control samples plus inclusive
+    topology samples;
+  * the key plots are normalized spectra, stage contours, composition
+    maps, acceptance maps, geometry maps, cutflows, and flow diagrams.
+
+Search aliases / keywords
+-------------------------
+
+MicroBooNE, NuMI, Lambda final state, Lambda topology, detached V0,
+Lambda to p pi, Sigma0 feed-through, charged-Sigma exchange, hyperon FSI,
+associated kaon production, strange baryon transport, truth-visible
+coverage, fiducial topology, p pi secondary vertex, SBND geometry
+comparison, NuWro, GENIE, GiBUU, BuildEventGenerators.
+
+End of file.
