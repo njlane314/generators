@@ -19,8 +19,38 @@ proposal_bin_width_gev="${proposal_bin_width_gev:-0.005}"
 skim_final_state="${skim_final_state:-1}"
 
 base_job="${base_job:-${repo_root}/analysis/cards/GiBUU2025_numu.job}"
-gibuu_bin="${gibuu_bin:-${repo_root}/../GiBUU/release/testRun/GiBUU.x}"
-gibuu_input="${gibuu_input:-${repo_root}/../GiBUU/buuinput}"
+if [ -z "${gibuu_bin:-}" ]; then
+  for candidate in \
+    "${repo_root}/GiBUU/release/testRun/GiBUU.x" \
+    "${repo_root}/../GiBUU/release/testRun/GiBUU.x"
+  do
+    if [ -x "${candidate}" ]; then
+      gibuu_bin="${candidate}"
+      break
+    fi
+  done
+  if [ -z "${gibuu_bin:-}" ]; then
+    if command -v GiBUU.x >/dev/null 2>&1; then
+      gibuu_bin="$(command -v GiBUU.x)"
+    elif command -v gibuu >/dev/null 2>&1; then
+      gibuu_bin="$(command -v gibuu)"
+    else
+      gibuu_bin="${repo_root}/GiBUU/release/testRun/GiBUU.x"
+    fi
+  fi
+fi
+if [ -z "${gibuu_input:-}" ]; then
+  for candidate in \
+    "${repo_root}/GiBUU/buuinput" \
+    "${repo_root}/../GiBUU/buuinput"
+  do
+    if [ -d "${candidate}" ]; then
+      gibuu_input="${candidate}"
+      break
+    fi
+  done
+  gibuu_input="${gibuu_input:-${repo_root}/GiBUU/buuinput}"
+fi
 reweight_fluxfile="${reweight_fluxfile:-$(ana_flux_root "${repo_root}")}"
 reweight_fluxhisto="${reweight_fluxhisto:-$(ana_flux_hist "${beam_mode}" "${beam_species}")}"
 sample="${sample:-GiBUU${version}_NuMI_${beam_mode}_${beam_species}_${interaction}_all_strange_filter_${fsi_state}}"
@@ -34,6 +64,7 @@ ana_check_cmds PrepareGiBUU nuisflat awk
 [ "${skim_final_state}" = 1 ] && ana_check_cmds root
 ana_check_exe "${gibuu_bin}"
 ana_check_files "${base_job}" "${reweight_fluxfile}"
+[ -d "${gibuu_input}" ] || ana_die "missing GiBUU input directory: ${gibuu_input}"
 mkdir -p "${outdir}" "${workdir}"
 
 process_id="$(ana_gibuu_process_id "${interaction}" "${beam_species}")"
