@@ -39,10 +39,6 @@ void generator_overlay() {
     Labels.push_back("NuWro");
     Colors.push_back(kRed+1);
 
-    Names.push_back(OutFilePath+"analyzer_output_NEUT.root"); 
-    Labels.push_back("NEUT");
-    Colors.push_back(kOrange+7);
-
     Names.push_back(OutFilePath+"analyzer_output_GiBUU.root"); 
     Labels.push_back("GiBUU");
     Colors.push_back(kGreen+1);

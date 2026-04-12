@@ -1,12 +1,8 @@
 #!/bin/bash
 
-export TERM=screen
+export TERM=${TERM:-screen}
 BASE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]:-${(%):-%x}}" )" && pwd )"
 source ${BASE_DIR}/global_vars.sh
-
-## NEUT
-export NEUTROOT=${BASE_DIR}/neut
-source ${NEUTROOT}/build/Linux/bin/setup.NEUT.sh 
 
 # GENIE
 export GENIE_FQ_DIR=${BASE_DIR}
@@ -36,5 +32,5 @@ source ${BASE_DIR}/nusystematics/build/Linux/bin/setup.nusystematics.sh
 source ${BASE_DIR}/nuisance/build/Linux/setup.sh
 #echo "NUISANCE setup is ready!"
 
-htgettoken -a htvaultprod.fnal.gov -i sbnd
-#htgettoken -a htvaultprod.fnal.gov -i uboone
+#htgettoken -a htvaultprod.fnal.gov -i sbnd
+htgettoken -a htvaultprod.fnal.gov -i uboone
