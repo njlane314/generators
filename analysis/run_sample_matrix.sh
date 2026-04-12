@@ -13,6 +13,7 @@ max_samples="${max_samples:-0}"
 seed_base="${seed_base:-1000}"
 batch_events="${batch_events:-${events}}"
 max_batches="${max_batches:-200}"
+gibuu_events_per_ensemble="${gibuu_events_per_ensemble:-5}"
 target_events="${events}"
 
 case "${target_events}" in
@@ -27,6 +28,10 @@ case "${max_batches}" in
   ''|*[!0-9]*) printf 'ERROR: max_batches must be a positive integer\n' >&2; exit 1 ;;
 esac
 [ "${max_batches}" -gt 0 ] || { printf 'ERROR: max_batches must be > 0\n' >&2; exit 1; }
+case "${gibuu_events_per_ensemble}" in
+  ''|*[!0-9]*) printf 'ERROR: gibuu_events_per_ensemble must be a positive integer\n' >&2; exit 1 ;;
+esac
+[ "${gibuu_events_per_ensemble}" -gt 0 ] || { printf 'ERROR: gibuu_events_per_ensemble must be > 0\n' >&2; exit 1; }
 
 want_generator() {
   [ -z "${generator_filter}" ] && return 0
@@ -95,7 +100,8 @@ run_generator_batch() {
       "${script_dir}/run_nuwro.sh"
       ;;
     GiBUU)
-      num_ensembles="${num_ensembles:-${batch_events}}" \
+      events="${batch_events}" \
+      gibuu_events_per_ensemble="${gibuu_events_per_ensemble}" \
       num_runs_same_energy="${num_runs_same_energy:-1}" \
       version="${version}" \
       knob="${knob}" \
@@ -118,7 +124,7 @@ run_generator_batch() {
 
 run_sample() {
   local n="$1"
-  local output_path sample_label reject_dir batch selected batch_sample batch_outdir batch_workdir batch_flat count_file merged_inputs
+  local output_path sample_label reject_dir batch selected batch_sample batch_outdir batch_workdir batch_flat count_file merged_inputs note
   local selected_files=()
   output_path="${repo_root}/$(expand_template "${input_template}")"
   sample_label="$(expand_template "${sample_template}")"
@@ -128,8 +134,16 @@ run_sample() {
     return 0
   fi
 
-  printf 'sample [%04d] %s version=%s knob=%s beam=%s species=%s interaction=%s fsi=%s target_selected=%s batch_events=%s max_batches=%s\n' \
-    "${n}" "${generator}" "${version}" "${knob}" "${beam_mode}" "${species}" "${interaction}" "${fsi_state}" "${target_events}" "${batch_events}" "${max_batches}"
+  note=""
+  if [ "${generator}" = "GiBUU" ]; then
+    if [ -n "${num_ensembles:-}" ]; then
+      note=" num_ensembles=${num_ensembles}"
+    else
+      note=" corrected_num_ensembles=$(( (batch_events + gibuu_events_per_ensemble - 1) / gibuu_events_per_ensemble ))"
+    fi
+  fi
+  printf 'sample [%04d] %s version=%s knob=%s beam=%s species=%s interaction=%s fsi=%s target_selected=%s batch_events=%s max_batches=%s%s\n' \
+    "${n}" "${generator}" "${version}" "${knob}" "${beam_mode}" "${species}" "${interaction}" "${fsi_state}" "${target_events}" "${batch_events}" "${max_batches}" "${note}"
 
   if [ "${dry_run}" = 1 ]; then
     return 0

@@ -5,6 +5,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/.." && pwd)"
 . "${script_dir}/sample_common.sh"
 
+events="${events:-100}"
 version="${version:-2025}"
 knob="${knob:-DIS_only}"
 beam_mode="${beam_mode:-FHC}"
@@ -12,7 +13,22 @@ beam_species="${beam_species:-numu}"
 interaction="${interaction:-CC}"
 fsi_state="${fsi_state:-fsi_on}"
 num_runs_same_energy="${num_runs_same_energy:-1}"
-num_ensembles="${num_ensembles:-100}"
+gibuu_events_per_ensemble="${gibuu_events_per_ensemble:-5}"
+case "${events}" in
+  ''|*[!0-9]*) ana_die "events must be a positive integer" ;;
+esac
+case "${gibuu_events_per_ensemble}" in
+  ''|*[!0-9]*) ana_die "gibuu_events_per_ensemble must be a positive integer" ;;
+esac
+[ "${events}" -gt 0 ] || ana_die "events must be > 0"
+[ "${gibuu_events_per_ensemble}" -gt 0 ] || ana_die "gibuu_events_per_ensemble must be > 0"
+if [ -z "${num_ensembles:-}" ]; then
+  num_ensembles="$(( (events + gibuu_events_per_ensemble - 1) / gibuu_events_per_ensemble ))"
+fi
+case "${num_ensembles}" in
+  ''|*[!0-9]*) ana_die "num_ensembles must be a positive integer" ;;
+esac
+[ "${num_ensembles}" -gt 0 ] || ana_die "num_ensembles must be > 0"
 proposal_min_gev="${proposal_min_gev:-0}"
 proposal_max_gev="${proposal_max_gev:-10}"
 proposal_bin_width_gev="${proposal_bin_width_gev:-0.005}"
@@ -136,6 +152,8 @@ raw_flat="${flat}"
 [ "${skim_final_state}" = 1 ] && raw_flat="${workdir}/${sample}.inclusive.flat.root"
 
 printf 'GiBUU sample: %s\n' "${sample}"
+printf '  requested proposal events: %s\n' "${events}"
+printf '  GiBUU numEnsembles: %s (events/ensemble correction: %s)\n' "${num_ensembles}" "${gibuu_events_per_ensemble}"
 printf '  flat proposal: %s\n' "${proposal_fluxfile}"
 printf '  NuMI reweight target: %s,%s\n' "${reweight_fluxfile}" "${reweight_fluxhisto}"
 printf '  output: %s\n' "${flat}"
