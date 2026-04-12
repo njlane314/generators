@@ -169,6 +169,23 @@ TString clean(TString text)
     return text;
 }
 
+TString normalize_beam_polarity(TString beam_polarity)
+{
+    beam_polarity.ToLower();
+    if (beam_polarity == "" || beam_polarity == "combined" ||
+        beam_polarity == "both" || beam_polarity == "all") return "combined";
+    if (beam_polarity == "fhc" || beam_polarity == "rhc") return beam_polarity;
+    return "";
+}
+
+std::vector<TString> flux_hist_names(const TString& beam_polarity)
+{
+    if (beam_polarity == "fhc") return {"numu_CV_AV_TPC_5MeV_bin"};
+    if (beam_polarity == "rhc") return {"numubar_CV_AV_TPC_5MeV_bin"};
+    if (beam_polarity == "combined") return {"numu_CV_AV_TPC_5MeV_bin", "numubar_CV_AV_TPC_5MeV_bin"};
+    return {};
+}
+
 TString infer_generator(TString sample)
 {
     sample.ToLower();
@@ -182,11 +199,13 @@ TString infer_knob(TString sample)
 {
     sample.ReplaceAll(".flat.root", "");
     sample.ReplaceAll(".root", "");
-    std::vector<TString> known = {"AR23_20i_00_000", "G18_10a_02_11a", "G18_10b_02_11a",
-                                  "G18_10a_02_11b", "G18_10b_02_11b", "G18_10c_02_11b",
-                                  "G18_10d_02_11b", "hyp_lambda_only", "hyp_sigma0_only",
-                                  "hyp_sigmam_only", "hyp_no_effmass", "all_strange",
-                                  "dis_only", "hyp_all", "fsi_on", "fsi_off"};
+    std::vector<TString> known = {
+        "AR23_20i_00_000", "G18_10a_02_11a", "G18_10b_02_11a",
+        "G18_10a_02_11b", "G18_10b_02_11b", "G18_10c_02_11b",
+        "G18_10d_02_11b", "hyp_lambda_only", "hyp_sigma0_only",
+        "hyp_sigmam_only", "hyp_no_effmass", "all_strange",
+        "dis_only", "hyp_all", "fsi_on", "fsi_off"
+    };
     TString knob = "";
     for (const TString& name : known) {
         if (!sample.Contains(name)) continue;
@@ -336,16 +355,21 @@ bool extend_flux(TH1* hist, double floor_fraction, flux_envelope& env)
     return true;
 }
 
-flux_envelope read_flux(TString path, double floor_fraction)
+flux_envelope read_flux(TString path, TString beam_polarity, double floor_fraction)
 {
     flux_envelope env;
+    beam_polarity = normalize_beam_polarity(beam_polarity);
+    if (beam_polarity == "") {
+        std::cerr << "Beam polarity must be FHC, RHC, or combined." << std::endl;
+        return env;
+    }
     TFile* file = TFile::Open(path, "READ");
     if (!file || file->IsZombie()) {
         std::cerr << "Could not open NuMI flux file: " << path.Data() << std::endl;
         return env;
     }
     std::vector<TString> used;
-    const std::vector<TString> names = {"numu_CV_AV_TPC_5MeV_bin", "numubar_CV_AV_TPC_5MeV_bin"};
+    const std::vector<TString> names = flux_hist_names(beam_polarity);
     for (const TString& name : names) {
         if (extend_flux(find_hist(file, name), floor_fraction, env)) used.push_back(name);
         else std::cerr << "Could not use NuMI flux histogram: " << name.Data() << std::endl;
@@ -358,6 +382,8 @@ flux_envelope read_flux(TString path, double floor_fraction)
     }
     env.source = path;
     env.source += " [";
+    env.source += beam_polarity;
+    env.source += ": ";
     for (int i = 0; i < int(used.size()); ++i) {
         if (i) env.source += ", ";
         env.source += used[i];
@@ -375,10 +401,12 @@ topology find_topology(TTree* tree, TString wp)
 {
     wp.ToLower();
     topology out;
-    out.flag = leaf(tree, {TString("topology_") + wp + "_flag",
-                           TString("lambda_topology_") + wp + "_flag",
-                           wp + "_topology_flag",
-                           wp + "_flag"});
+    out.flag = leaf(tree, {
+        TString("topology_") + wp + "_flag",
+        TString("lambda_topology_") + wp + "_flag",
+        wp + "_topology_flag",
+        wp + "_flag"
+    });
     if (out.flag) {
         out.source = out.flag->GetName();
         return out;
@@ -418,31 +446,36 @@ void scale_density(TH1D* hist)
     }
 }
 
-void write_row(std::ofstream& out, const TString& sample, const TString& gen, const TString& knob,
-               const TString& section, const TString& name, const acc& row, double denom,
-               const TString& definition)
+void write_row(
+    std::ofstream& out, const TString& sample, const TString& gen, const TString& knob,
+    const TString& beam_polarity, const TString& section, const TString& name,
+    const acc& row, double denom, const TString& definition
+)
 {
     const double frac = denom > 0.0 ? row.weight / denom : 0.0;
     out << csv(sample).Data() << ',' << csv(gen).Data() << ',' << csv(knob).Data() << ','
-        << csv(section).Data() << ',' << csv(name).Data() << ',' << row.raw << ','
-        << row.weight << ',' << std::sqrt(row.weight_sum_squares) << ','
-        << row.xsec << ',' << std::sqrt(row.xsec_sum_squares) << ','
+        << csv(beam_polarity).Data() << ',' << csv(section).Data() << ',' << csv(name).Data()
+        << ',' << row.raw << ',' << row.weight << ',' << std::sqrt(row.weight_sum_squares)
+        << ',' << row.xsec << ',' << std::sqrt(row.xsec_sum_squares) << ','
         << frac << ',' << csv(definition).Data() << '\n';
 }
 
-void write_summary(const TString& path, const TString& sample, const TString& gen,
-                   const TString& knob, const acc& selected,
-                   const std::vector<acc>& origins, const std::vector<acc>& modes,
-                   const std::vector<acc>& categories)
+void write_summary(
+    const TString& path, const TString& sample, const TString& gen, const TString& knob,
+    const TString& beam_polarity, const acc& selected, const std::vector<acc>& origins,
+    const std::vector<acc>& modes, const std::vector<acc>& categories
+)
 {
     std::ofstream out(path.Data());
-    out << "sample,generator,knob,section,name,raw_events,weighted_yield,"
+    out << "sample,generator,knob,beam_polarity,section,name,raw_events,weighted_yield,"
         << "weighted_stat_uncertainty,xsec_weighted_1e38_cm2_per_target,"
         << "xsec_weighted_stat_uncertainty_1e38_cm2_per_target,"
         << "fraction_of_selected,definition\n";
     out << std::setprecision(12);
-    write_row(out, sample, gen, knob, "total", "selected_topology", selected, selected.weight,
-              "inclusive fiducial Lambda topology inside the NuMI flux envelope");
+    write_row(
+        out, sample, gen, knob, beam_polarity, "total", "selected_topology",
+        selected, selected.weight, "inclusive fiducial Lambda topology inside the NuMI flux envelope"
+    );
 
     const auto o_labels = origin_labels();
     const auto o_defs = origin_defs();
@@ -451,22 +484,32 @@ void write_summary(const TString& path, const TString& sample, const TString& ge
     const auto c_labels = category_labels();
     const auto c_defs = category_defs();
     for (int i = 0; i < int(origins.size()); ++i) {
-        write_row(out, sample, gen, knob, "primary_origin", o_labels[i], origins[i], selected.weight, o_defs[i]);
+        write_row(
+            out, sample, gen, knob, beam_polarity, "primary_origin",
+            o_labels[i], origins[i], selected.weight, o_defs[i]
+        );
     }
     for (int i = 0; i < int(modes.size()); ++i) {
-        write_row(out, sample, gen, knob, "interaction_mode", m_labels[i], modes[i], selected.weight, m_defs[i]);
+        write_row(
+            out, sample, gen, knob, beam_polarity, "interaction_mode",
+            m_labels[i], modes[i], selected.weight, m_defs[i]
+        );
     }
     for (int i = 0; i < int(categories.size()); ++i) {
-        write_row(out, sample, gen, knob, "visible_category", c_labels[i], categories[i], selected.weight, c_defs[i]);
+        write_row(
+            out, sample, gen, knob, beam_polarity, "visible_category",
+            c_labels[i], categories[i], selected.weight, c_defs[i]
+        );
     }
 }
 
-void write_origin_mode(const TString& path, const TString& sample, const TString& gen,
-                       const TString& knob, const std::vector<std::vector<acc>>& matrix,
-                       double denom)
+void write_origin_mode(
+    const TString& path, const TString& sample, const TString& gen, const TString& knob,
+    const TString& beam_polarity, const std::vector<std::vector<acc>>& matrix, double denom
+)
 {
     std::ofstream out(path.Data());
-    out << "sample,generator,knob,primary_origin,interaction_mode,raw_events,"
+    out << "sample,generator,knob,beam_polarity,primary_origin,interaction_mode,raw_events,"
         << "weighted_yield,weighted_stat_uncertainty,xsec_weighted_1e38_cm2_per_target,"
         << "xsec_weighted_stat_uncertainty_1e38_cm2_per_target,fraction_of_selected\n";
     out << std::setprecision(12);
@@ -477,19 +520,22 @@ void write_origin_mode(const TString& path, const TString& sample, const TString
             const acc& row = matrix[o][m];
             const double frac = denom > 0.0 ? row.weight / denom : 0.0;
             out << csv(sample).Data() << ',' << csv(gen).Data() << ',' << csv(knob).Data() << ','
-                << csv(origins[o]).Data() << ',' << csv(modes[m]).Data() << ',' << row.raw << ','
-                << row.weight << ',' << std::sqrt(row.weight_sum_squares) << ','
-                << row.xsec << ',' << std::sqrt(row.xsec_sum_squares) << ','
+                << csv(beam_polarity).Data() << ',' << csv(origins[o]).Data() << ','
+                << csv(modes[m]).Data() << ',' << row.raw << ',' << row.weight << ','
+                << std::sqrt(row.weight_sum_squares) << ',' << row.xsec << ','
+                << std::sqrt(row.xsec_sum_squares) << ','
                 << frac << '\n';
         }
     }
 }
 
-void write_raw_modes(const TString& path, const TString& sample, const TString& gen,
-                     const TString& knob, const std::map<int, acc>& rows, double denom)
+void write_raw_modes(
+    const TString& path, const TString& sample, const TString& gen, const TString& knob,
+    const TString& beam_polarity, const std::map<int, acc>& rows, double denom
+)
 {
     std::ofstream out(path.Data());
-    out << "sample,generator,knob,raw_mode,raw_events,weighted_yield,"
+    out << "sample,generator,knob,beam_polarity,raw_mode,raw_events,weighted_yield,"
         << "weighted_stat_uncertainty,xsec_weighted_1e38_cm2_per_target,"
         << "xsec_weighted_stat_uncertainty_1e38_cm2_per_target,"
         << "fraction_of_selected\n";
@@ -497,28 +543,37 @@ void write_raw_modes(const TString& path, const TString& sample, const TString& 
     for (const auto& item : rows) {
         const double frac = denom > 0.0 ? item.second.weight / denom : 0.0;
         out << csv(sample).Data() << ',' << csv(gen).Data() << ',' << csv(knob).Data() << ','
-            << item.first << ',' << item.second.raw << ',' << item.second.weight << ','
-            << std::sqrt(item.second.weight_sum_squares) << ','
-            << item.second.xsec << ',' << std::sqrt(item.second.xsec_sum_squares) << ','
+            << csv(beam_polarity).Data() << ',' << item.first << ',' << item.second.raw
+            << ',' << item.second.weight << ',' << std::sqrt(item.second.weight_sum_squares)
+            << ',' << item.second.xsec << ',' << std::sqrt(item.second.xsec_sum_squares) << ','
             << frac << '\n';
     }
 }
 
 }  // namespace
 
-void primary_mechanism(TString input_file,
-                       TString output_dir = "analysis/output",
-                       TString sample_label = "",
-                       TString generator = "",
-                       TString knob = "",
-                       TString working_point = "nominal",
-                       TString flux_file = "example/numi/flux/microboone_numi_flux_5mev.root",
-                       double flux_floor_fraction = 0.0)
+void primary_mechanism(
+    TString input_file,
+    TString output_dir = "analysis/output",
+    TString sample_label = "",
+    TString generator = "",
+    TString knob = "",
+    TString working_point = "nominal",
+    TString flux_file = "example/numi/flux/microboone_numi_flux_5mev.root",
+    double flux_floor_fraction = 0.0,
+    TString beam_polarity = "combined"
+)
 {
     if (sample_label == "") sample_label = gSystem->BaseName(input_file.Data());
     if (generator == "") generator = infer_generator(sample_label);
     if (knob == "") knob = infer_knob(sample_label);
+    beam_polarity = normalize_beam_polarity(beam_polarity);
+    if (beam_polarity == "") {
+        std::cerr << "Beam polarity must be FHC, RHC, or combined." << std::endl;
+        return;
+    }
     const TString sample = clean(sample_label);
+    const TString beam = clean(beam_polarity);
 
     TFile* input = TFile::Open(input_file, "READ");
     if (!input || input->IsZombie()) {
@@ -541,15 +596,17 @@ void primary_mechanism(TString input_file,
         return;
     }
 
-    const flux_envelope flux = read_flux(flux_file, flux_floor_fraction);
+    const flux_envelope flux = read_flux(flux_file, beam_polarity, flux_floor_fraction);
     if (!flux.active) {
         std::cerr << "Refusing to make primary-mechanism summaries without a NuMI flux envelope." << std::endl;
         input->Close();
         return;
     }
 
-    stage fsp{leaf(tree, {"nfsp", "n_fsp"}), leaf(tree, {"pdg"}), leaf(tree, {"px"}),
-              leaf(tree, {"py"}), leaf(tree, {"pz"}), leaf(tree, {"E", "energy"})};
+    stage fsp{
+        leaf(tree, {"nfsp", "n_fsp"}), leaf(tree, {"pdg"}), leaf(tree, {"px"}),
+        leaf(tree, {"py"}), leaf(tree, {"pz"}), leaf(tree, {"E", "energy"})
+    };
     stage primary{leaf(tree, {"nvertp", "n_vertp"}), leaf(tree, {"pdg_vert"})};
     if (!fsp.n || !fsp.pdg || !fsp.px || !fsp.py || !fsp.pz || !fsp.energy || !primary.n || !primary.pdg) {
         std::cerr << "Missing required FlatTree final-state or primary-vertex branches." << std::endl;
@@ -573,27 +630,29 @@ void primary_mechanism(TString input_file,
     const std::vector<TString> species = {"Lambda", "Sigma-", "Sigma0", "Sigma+", "Xi", "Omega", "K", "other_Y"};
 
     TH1D h_cutflow("topology_cutflow", ";selection;events [10^{-38} cm^{2}/target]", 10, 0.5, 10.5);
-    label(h_cutflow.GetXaxis(), {"numi_flux", "final_Lambda", "visible_p_pi", "flat_proxy", "selected_topology",
-                                  "S1_CC_muon", "S2_K", "S3_lowExtra", "S4_EM", "S5_noMuon"});
+    label(h_cutflow.GetXaxis(), {
+        "numi_flux", "final_Lambda", "visible_p_pi", "flat_proxy", "selected_topology",
+        "S1_CC_muon", "S2_K", "S3_lowExtra", "S4_EM", "S5_noMuon"
+    });
     TH1D h_origin("primary_origin", ";primary origin;events [10^{-38} cm^{2}/target]",
-                  origins.size(), -0.5, origins.size() - 0.5);
+        origins.size(), -0.5, origins.size() - 0.5);
     TH1D h_mode("interaction_mode", ";interaction mode;events [10^{-38} cm^{2}/target]",
-                modes.size(), -0.5, modes.size() - 0.5);
+        modes.size(), -0.5, modes.size() - 0.5);
     TH1D h_raw_mode("raw_mode", ";raw mode;events [10^{-38} cm^{2}/target]", 121, -60.5, 60.5);
     TH1D h_primary_species("primary_strange_species",
-                           ";primary strange species;particles [10^{-38} cm^{2}/target]",
-                           species.size(), -0.5, species.size() - 0.5);
+        ";primary strange species;particles [10^{-38} cm^{2}/target]",
+        species.size(), -0.5, species.size() - 0.5);
     TH1D h_enu("enu_selected_topology", ";E_{#nu} [GeV];events / GeV [10^{-38} cm^{2}/target]",
-               80, flux.emin, flux.emax);
+        80, flux.emin, flux.emax);
     TH1D h_p_lambda("p_lambda_selected_topology",
                     ";p_{#Lambda} [GeV];events / GeV [10^{-38} cm^{2}/target]", 80, 0.0, 4.0);
     TH2D h_origin_mode("primary_origin_vs_interaction_mode", ";primary origin;interaction mode",
-                       origins.size(), -0.5, origins.size() - 0.5, modes.size(), -0.5, modes.size() - 0.5);
+        origins.size(), -0.5, origins.size() - 0.5, modes.size(), -0.5, modes.size() - 0.5);
     TH2D h_origin_category("primary_origin_vs_visible_category", ";primary origin;visible category",
-                           origins.size(), -0.5, origins.size() - 0.5,
-                           categories.size(), -0.5, categories.size() - 0.5);
+        origins.size(), -0.5, origins.size() - 0.5,
+        categories.size(), -0.5, categories.size() - 0.5);
     TH2D h_p_lambda_origin("p_lambda_vs_primary_origin", ";p_{#Lambda} [GeV];primary origin",
-                           80, 0.0, 4.0, origins.size(), -0.5, origins.size() - 0.5);
+        80, 0.0, 4.0, origins.size(), -0.5, origins.size() - 0.5);
     label(h_origin.GetXaxis(), origins);
     label(h_mode.GetXaxis(), modes);
     label(h_primary_species.GetXaxis(), species);
@@ -670,8 +729,8 @@ void primary_mechanism(TString input_file,
 
         const primary_counts primary_data = read_primary(primary);
         const bool true_lambda = final_lambda || has_topo_flags || primary_data.lambda ||
-                                 primary_data.sigma_0 || primary_data.charged_sigma ||
-                                 primary_data.strange_baryon;
+            primary_data.sigma_0 || primary_data.charged_sigma ||
+            primary_data.strange_baryon;
         const int origin = origin_bin(primary_data, true_lambda);
         const int mode = mode_bin(int_value(mode_leaf), mode_leaf != nullptr);
         const bool cat[] = {true, int_value(cc) == 1 && visible_muon, n_kaon > 0,
@@ -710,14 +769,17 @@ void primary_mechanism(TString input_file,
 
     gSystem->mkdir(output_dir.Data(), true);
     if (!output_dir.EndsWith("/")) output_dir += "/";
-    const TString root_path = output_dir + "primary_mechanism_" + sample + ".root";
-    const TString summary_path = output_dir + "primary_mechanism_" + sample + "_summary.csv";
-    const TString matrix_path = output_dir + "primary_mechanism_" + sample + "_origin_mode.csv";
-    const TString raw_mode_path = output_dir + "primary_mechanism_" + sample + "_raw_mode.csv";
+    const TString root_path = output_dir + "primary_mechanism_" + sample + "_" + beam + ".root";
+    const TString summary_path = output_dir + "primary_mechanism_" + sample + "_" + beam + "_summary.csv";
+    const TString matrix_path = output_dir + "primary_mechanism_" + sample + "_" + beam + "_origin_mode.csv";
+    const TString raw_mode_path = output_dir + "primary_mechanism_" + sample + "_" + beam + "_raw_mode.csv";
 
-    write_summary(summary_path, sample_label, generator, knob, selected, origin_count, mode_count, category_count);
-    write_origin_mode(matrix_path, sample_label, generator, knob, origin_mode, selected.weight);
-    write_raw_modes(raw_mode_path, sample_label, generator, knob, raw_mode, selected.weight);
+    write_summary(summary_path, sample_label, generator, knob, beam_polarity,
+        selected, origin_count, mode_count, category_count);
+    write_origin_mode(matrix_path, sample_label, generator, knob, beam_polarity,
+        origin_mode, selected.weight);
+    write_raw_modes(raw_mode_path, sample_label, generator, knob, beam_polarity,
+        raw_mode, selected.weight);
     scale_density(&h_enu);
     scale_density(&h_p_lambda);
 
@@ -732,6 +794,8 @@ void primary_mechanism(TString input_file,
     note += generator;
     note += "; knob=";
     note += knob;
+    note += "; beam_polarity=";
+    note += beam_polarity;
     note += "; numi_flux_source=";
     note += flux.source;
     note += "; numi_flux_emin_GeV=";
@@ -753,17 +817,18 @@ void primary_mechanism(TString input_file,
     output.Close();
 
     std::cout << "\nSample: " << sample_label.Data()
-              << "\nGenerator: " << generator.Data()
-              << "\nKnob: " << knob.Data()
-              << "\nInput: " << input_file.Data()
-              << "\nEntries: " << entries
-              << "\nEntries inside NuMI flux envelope: " << entries_in_flux
-              << "\nNuMI flux envelope: " << flux.emin << " to " << flux.emax
-              << " GeV from " << flux.source.Data()
-              << "\nTopology selection source: " << topo.source.Data()
-              << "\nOutputs:\n  " << root_path.Data()
-              << "\n  " << summary_path.Data()
-              << "\n  " << matrix_path.Data()
-              << "\n  " << raw_mode_path.Data() << std::endl;
+        << "\nGenerator: " << generator.Data()
+        << "\nKnob: " << knob.Data()
+        << "\nBeam polarity: " << beam_polarity.Data()
+        << "\nInput: " << input_file.Data()
+        << "\nEntries: " << entries
+        << "\nEntries inside NuMI flux envelope: " << entries_in_flux
+        << "\nNuMI flux envelope: " << flux.emin << " to " << flux.emax
+        << " GeV from " << flux.source.Data()
+        << "\nTopology selection source: " << topo.source.Data()
+        << "\nOutputs:\n  " << root_path.Data()
+        << "\n  " << summary_path.Data()
+        << "\n  " << matrix_path.Data()
+        << "\n  " << raw_mode_path.Data() << std::endl;
     input->Close();
 }

@@ -26,11 +26,13 @@ The matrix macro also writes analysis/output/topology_yields_uncertainties.csv w
 
 Primary mechanism study for one inclusive Lambda-topology sample:
 
-root -l -b -q 'analysis/primary_mechanism.cxx+("path/to/inclusive.flat.root","analysis/output","sample_label","GENIE","nominal","nominal","example/numi/flux/microboone_numi_flux_5mev.root")'
+root -l -b -q 'analysis/primary_mechanism.cxx+("path/to/inclusive.flat.root","analysis/output","sample_label","GENIE","nominal","nominal","example/numi/flux/microboone_numi_flux_5mev.root",0.0,"fhc")'
 
 Nuclear-exit migration study for one reduced ntuple sample:
 
-root -l -b -q 'analysis/nuclear_exit.cxx+("path/to/reduced.flat.root","analysis/output","sample_label","GENIE","nominal","example/numi/flux/microboone_numi_flux_5mev.root")'
+root -l -b -q 'analysis/nuclear_exit.cxx+("path/to/reduced.flat.root","analysis/output","sample_label","GENIE","nominal","example/numi/flux/microboone_numi_flux_5mev.root",0.0,"fhc")'
+
+Use the last argument as "fhc", "rhc", or "combined". The bundled NuMI flux file exposes numu and numubar histograms; these macros use numu for fhc, numubar for rhc, and their union for combined.
 
 Outputs:
 
@@ -39,19 +41,19 @@ analysis/output/overlay_*.pdf
 analysis/output/map_*.pdf
 analysis/output/topology_yields.csv
 analysis/output/topology_yields_uncertainties.csv
-analysis/output/primary_mechanism_<sample_label>.root
-analysis/output/primary_mechanism_<sample_label>_summary.csv
-analysis/output/primary_mechanism_<sample_label>_origin_mode.csv
-analysis/output/primary_mechanism_<sample_label>_raw_mode.csv
-analysis/output/nuclear_exit_<sample_label>.root
-analysis/output/nuclear_exit_<sample_label>_summary.csv
-analysis/output/nuclear_exit_<sample_label>_migration.csv
-analysis/output/nuclear_exit_<sample_label>_raw_exit_pdg.csv
+analysis/output/primary_mechanism_<sample_label>_<beam_polarity>.root
+analysis/output/primary_mechanism_<sample_label>_<beam_polarity>_summary.csv
+analysis/output/primary_mechanism_<sample_label>_<beam_polarity>_origin_mode.csv
+analysis/output/primary_mechanism_<sample_label>_<beam_polarity>_raw_mode.csv
+analysis/output/nuclear_exit_<sample_label>_<beam_polarity>.root
+analysis/output/nuclear_exit_<sample_label>_<beam_polarity>_summary.csv
+analysis/output/nuclear_exit_<sample_label>_<beam_polarity>_migration.csv
+analysis/output/nuclear_exit_<sample_label>_<beam_polarity>_raw_exit_pdg.csv
 
 This is a first pass over NUISANCE FlatTree_VARS. It uses pdg_vert for primary strange content, final state pdg for final Lambda content, and a p plus pi-minus proxy requiring primary or final hyperon evidence for S0.
 
-The primary mechanism macro keeps the Lambda-topology sample inclusive, then reports the selected sample by primary strange origin and generator Mode category with sample, generator, knob, and statistical uncertainty columns. It first restricts all reported counts and spectra to the non-zero MicroBooNE NuMI flux envelope from the provided numu and numubar flux histograms; it refuses to run if it cannot load that envelope or the sample has no Enu_true branch. If reduced topology flags such as topology_nominal_flag or fiducial_vertex_flag are not present, it falls back to a FlatTree proxy requiring final-state Lambda plus visible-proxy proton and pi-minus, and prints that caveat in the ROOT metadata and terminal output.
+The primary mechanism macro keeps the Lambda-topology sample inclusive, then reports the selected sample by primary strange origin and generator Mode category with sample, generator, knob, beam_polarity, and statistical uncertainty columns. It first restricts all reported counts and spectra to the selected non-zero MicroBooNE NuMI flux envelope; it refuses to run if it cannot load that envelope or the sample has no Enu_true branch. If reduced topology flags such as topology_nominal_flag or fiducial_vertex_flag are not present, it falls back to a FlatTree proxy requiring final-state Lambda plus visible-proxy proton and pi-minus, and prints that caveat in the ROOT metadata and terminal output.
 
-The nuclear-exit macro also restricts all reported counts and spectra to the non-zero MicroBooNE NuMI flux envelope and writes sample, generator, and knob columns. It requires explicit Stage B branches such as n_exitp plus pdg_exit, or nuclear_exit_n plus nuclear_exit_pdg, and it refuses to use final-state pdg as a nuclear-exit proxy.
+The nuclear-exit macro also restricts all reported counts and spectra to the selected non-zero MicroBooNE NuMI flux envelope and writes sample, generator, knob, and beam_polarity columns. It requires explicit Stage B branches such as n_exitp plus pdg_exit, or nuclear_exit_n plus nuclear_exit_pdg, and it refuses to use final-state pdg as a nuclear-exit proxy.
 
 The detached Lambda topology still needs the reduced ntuple fields from CONTEXT: nuclear-exit strange species, Lambda decay vertex, daughter ancestry, fiducial flags, decay length, and truth-visible containment flags.
