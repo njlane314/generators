@@ -1,27 +1,26 @@
-# All these commands need to be ran on the FNAL gpvm's
+All these commands need to be run on the FNAL gpvms.
 
-# To build / link all the event generators + Nuisance
+To build/link all the event generators and NUISANCE:
 
 git clone https://github.com/afropapp13/BuildEventGenerators.git;
 cd BuildEventGenerators;
 ./build_generators.sh;
 
-# To test that the build was successful by producing a few events
+To test that the build was successful by producing a few events:
+
 cd example;
 ./run_all.sh;
 
-# To setup the enviroment, source the setup script every time that you connect to the gpvm machines
+To set up the environment, source the setup script every time you connect to the gpvm machines:
 
 source setup_generators.sh
 
-# GENIE cross-section splines
+GENIE cross-section splines
 
-Generate a GENIE spline XML with `gmkspl` before running `gevgen` if the required probe/target/interaction/tune/energy-range combination is not already available:
+Generate a GENIE spline XML with gmkspl before running gevgen if the required probe/target/interaction/tune/energy-range combination is not already available:
 
-```bash
 gmkspl -p 14 -t 1000180400 -e 10. \
   -o example/samples/14_1000180400_CC_v3_6_2_AR23_20i_00_000.xml \
   --tune AR23_20i_00_000 --event-generator-list CC
-```
 
-This example is for `numu` (`14`) charged-current scattering on Ar-40 (`1000180400`) using tune `AR23_20i_00_000` up to `10 GeV`. The flux file is not an input to `gmkspl`; it is supplied later to `gevgen` with `-f flux.root,histname`. Regenerate the XML only when the probe, target, interaction list, GENIE tune/model setup, or energy coverage changes.
+This example is for numu (PDG 14) charged-current scattering on Ar-40 (1000180400) using tune AR23_20i_00_000 up to 10 GeV. The flux file is not an input to gmkspl; it is supplied later to gevgen with -f flux.root,histname. Regenerate the XML only when the probe, target, interaction list, GENIE tune/model setup, or energy coverage changes.

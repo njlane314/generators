@@ -1,7 +1,7 @@
 Usage: ./submit_genie.sh [--prod] NUM_JOBS JOB_NAME ARGS_FILE SPLINES_FILE FLUX_FILE FLUX_HIST_NAME OUTPUT_DIRECTORY GIT_CHECKOUT
 
 # don't forget
-# cp genie_grid.sh /pnfs/sbnd/persistent/users/apapadop/grid # or wherever your /persistent area might be
+# cp genie_grid.sh /pnfs/uboone/persistent/users/apapadop/grid # or wherever your /persistent area might be
 
 JOB_NAME = arbitrary prefix for the output files
 
@@ -13,10 +13,10 @@ FLUX_FILE = ROOT file containing the flux histogram. Same storage rules under /c
 
 FLUX_HIST_NAME = Name used by TFile::GetObject() to retrieve the flux histogram
 
-OUTPUT_DIRECTORY = folder on scratch or persistent that will receive the output files eg /pnfs/sbnd/persistent/users/apapadop/grid
+OUTPUT_DIRECTORY = folder on scratch or persistent that will receive the output files eg /pnfs/uboone/persistent/users/apapadop/grid
 
 GIT_CHECKOUT = identifier passed to git to indicate what version of the code you want checked out. Valid options are commit hashes, origin/BRANCH_NAME for a branch named BRANCH_NAME, and version tags like R-3_06_00.
 
 example:
 
-./submit_genie.sh 2 afro_grid_test_gene args.txt /pnfs/sbnd/persistent/users/apapadop/grid/14_1000180400_CC_v3_6_0_AR23_20i_00_000.xml /pnfs/sbnd/persistent/users/apapadop/grid/sbnd_flux.root flux_sbnd_numu /pnfs/sbnd/persistent/users/apapadop/grid/ tags/R-3_06_00
+./submit_genie.sh 2 afro_grid_test_gene args.txt /pnfs/uboone/persistent/users/apapadop/grid/14_1000180400_CC_v3_6_0_AR23_20i_00_000.xml /pnfs/uboone/persistent/users/apapadop/grid/MCC9_FluxHist_volTPCActive.root hEnumu_cv /pnfs/uboone/persistent/users/apapadop/grid/ tags/R-3_06_00
