@@ -98,7 +98,12 @@ The summary table reports whether the yield envelope is large relative to the
 central row or its statistical uncertainty. The member table reports the yield
 shift if a variation is favoured and the leave-one-out envelope contraction if
 that variation is excluded. Use the fourth argument to change the grouping:
-`beam`, `beam_envelope`, `all_beam`, or `generator`.
+`beam`, `beam_envelope`, `all_beam`, or `generator`. The wrapper also writes a
+ranked-impact SVG plot (`*_ranked_impacts.svg`) that sorts the largest signed
+fractional yield shifts, colors them by model axis, and annotates the
+statistical pull. Rerun just the plot from an existing members table with:
+
+analysis/plot_phenomenology_sensitivity.sh analysis/output/phenomenology_sensitivity/detector_visible_Lambda_to_p_piminus_beam_members.tsv
 
 Then make the FHC/RHC kinematic beam envelope:
 
@@ -206,6 +211,7 @@ analysis/output/expected_event_yields/expected_event_yields_summary.md
 analysis/output/phenomenology_sensitivity/*_summary.tsv
 analysis/output/phenomenology_sensitivity/*_members.tsv
 analysis/output/phenomenology_sensitivity/*_axes.tsv
+analysis/output/phenomenology_sensitivity/*_ranked_impacts.svg
 analysis/output/phenomenology_sensitivity/*_README.txt
 analysis/output/beam_kinematic_envelope/beam_kinematic_envelope_summary.csv
 analysis/output/beam_kinematic_envelope/beam_envelope_*.csv
