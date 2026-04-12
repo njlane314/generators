@@ -29,11 +29,11 @@ comparable to GENIE and NuWro for the same `events`.  Set `run_plots=1` to also
 exercise the
 kinematic-envelope and coverage plot macros.  Use
 `plan=analysis/config/generator_loop_plan.tsv` only when you want the full
-60-row analysis matrix.  The full plan now uses FHC/RHC beam reweighting for
+44-row analysis matrix.  The full plan now uses FHC/RHC beam reweighting for
 GENIE and NuWro: RHC analysis rows read the FHC-generated flat proposal and
 apply the RHC NuMI flux reweight downstream.  GiBUU remains beam-specific
 because `PrepareGiBUU` receives the beam flux during flat preparation.  With the
-current full plan this means 60 analysis rows but 34 generated flat samples.
+current full plan this means 44 analysis rows but 26 generated flat samples.
 Set `dry_run=1` on `analysis/run_sample_matrix.sh` to print the proposal sample
 list without running generators.
 
