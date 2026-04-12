@@ -1,2 +1,0 @@
-sample_label	selection_scope	requirement	pdg_any_of	particle_names	momentum_requirement	notes
-hyperon_final_state_inclusive	generator_final_state	at least one listed final-state particle	3122,3212,3322,3312,3334	Lambda,Sigma0,Xi0,Xi-,Omega-	none	Use an inclusive OR over the generator final-state particle list; do not impose momentum, angular, or visible-topology cuts at sample generation.

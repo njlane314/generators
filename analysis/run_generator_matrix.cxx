@@ -339,7 +339,7 @@ void run_nuclear_exit(
 }  // namespace
 
 void run_generator_matrix(
-    TString plan_file = "ana/config/generator_loop_plan.tsv",
+    TString plan_file = "analysis/config/generator_loop_plan.tsv",
     TString output_dir = "analysis/output/matrix",
     TString working_point = "nominal",
     TString flux_file = "example/numi/flux/microboone_numi_flux_5mev.root",

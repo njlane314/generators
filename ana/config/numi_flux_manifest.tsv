@@ -1,9 +1,0 @@
-flux_id	format	beam_mode	beam_species	flux_file	flux_object_or_format	notes
-microboone_numi_fhc_numu_root	root	FHC	numu	example/numi/flux/microboone_numi_flux_5mev.root	fhc/numu/Detsmear/numu_CV_AV_TPC_5MeV_bin	Use as the target NuMI flux reweight histogram for flat 0-10 GeV generated samples.
-microboone_numi_fhc_numubar_root	root	FHC	numubar	example/numi/flux/microboone_numi_flux_5mev.root	fhc/numubar/Detsmear/numubar_CV_AV_TPC_5MeV_bin	Use as the target NuMI flux reweight histogram for flat 0-10 GeV generated samples.
-microboone_numi_rhc_numu_root	root	RHC	numu	example/numi/flux/microboone_numi_flux_5mev.root	rhc/numu/Detsmear/numu_CV_AV_TPC_5MeV_bin	Use as the target NuMI flux reweight histogram for flat 0-10 GeV generated samples.
-microboone_numi_rhc_numubar_root	root	RHC	numubar	example/numi/flux/microboone_numi_flux_5mev.root	rhc/numubar/Detsmear/numubar_CV_AV_TPC_5MeV_bin	Use as the target NuMI flux reweight histogram for flat 0-10 GeV generated samples.
-microboone_numi_fhc_numu_dat	two_column_dat	FHC	numu	example/numi/flux/gibuu_numi_fhc_numu.dat	energy_GeV flux_per_5MeV_bin_per_1e6POT	Use as a text-format target NuMI flux reweight table for flat 0-10 GeV generated samples.
-microboone_numi_fhc_numubar_dat	two_column_dat	FHC	numubar	example/numi/flux/gibuu_numi_fhc_numubar.dat	energy_GeV flux_per_5MeV_bin_per_1e6POT	Use as a text-format target NuMI flux reweight table for flat 0-10 GeV generated samples.
-microboone_numi_rhc_numu_dat	two_column_dat	RHC	numu	example/numi/flux/gibuu_numi_rhc_numu.dat	energy_GeV flux_per_5MeV_bin_per_1e6POT	Use as a text-format target NuMI flux reweight table for flat 0-10 GeV generated samples.
-microboone_numi_rhc_numubar_dat	two_column_dat	RHC	numubar	example/numi/flux/gibuu_numi_rhc_numubar.dat	energy_GeV flux_per_5MeV_bin_per_1e6POT	Use as a text-format target NuMI flux reweight table for flat 0-10 GeV generated samples.

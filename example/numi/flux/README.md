@@ -17,7 +17,9 @@ needed for reweighting.  They are two-column tables:
 
   `energy_GeV flux_per_5MeV_bin_per_1e6POT`
 
-The analysis manifest is `ana/config/numi_flux_manifest.tsv`.
+The active generator-loop manifest is `analysis/config/generator_loop_plan.tsv`;
+the flux path mapping used by the local sample runners is in
+`analysis/sample_common.sh`.
 
 The GiBUU example script writes `flat_0_10gev_5mev.dat` at runtime as the
 flat proposal spectrum; that generated file is not a NuMI flux file.

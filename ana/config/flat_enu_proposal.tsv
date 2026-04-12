@@ -1,2 +1,0 @@
-proposal_id	emin_gev	emax_gev	bin_width_gev	proposal_density	reweight_target	notes
-flat_0_10gev_5mev	0.0	10.0	0.005	uniform	example/numi/flux/microboone_numi_flux_5mev.root	Generate events flat in neutrino energy across 0-10 GeV, then apply the selected NuMI flux histogram as an analysis weight. For normalized composition, any common flux-weight normalization cancels; for flux-averaged rates, normalize by the integrated target flux over 0-10 GeV.

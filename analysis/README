@@ -4,14 +4,29 @@ Run the generator loop from the repository root:
 
 root -l -b -q analysis/loop_generators.cxx
 
-The loop is manifest-driven by `ana/config/generator_loop_plan.tsv`. It expands
+Make local proxy flat samples from the repository root:
+
+analysis/run_genie.sh
+analysis/run_nuwro.sh
+analysis/run_gibuu.sh
+analysis/run_all.sh
+
+These are analysis-local copies of the example generator runners with paths
+updated to use `example/numi/flux` for the NuMI reweight target, keep the
+generation proposal flat over 0-10 GeV, and write flat outputs into
+`analysis/output/proxy_flat/<generator>`.  The final output is skimmed by
+`analysis/skim_final_state_hyperon.cxx` to require at least one final-state
+Lambda, Sigma0, Xi0, Xi-, or Omega- with no momentum cut.  Set
+`skim_final_state=0` to keep inclusive debug flats.
+
+The loop is manifest-driven by `analysis/config/generator_loop_plan.tsv`. It expands
 generator, version, knob/config, beam mode, beam species, interaction, and FSI
 state lists, skips missing files, and writes
 `analysis/output/matrix/generator_matrix_status.csv`.
 
 Equivalent explicit call:
 
-analysis/run_generator_matrix.sh ana/config/generator_loop_plan.tsv analysis/output/matrix
+analysis/run_generator_matrix.sh analysis/config/generator_loop_plan.tsv analysis/output/matrix
 
 The default loop runs `primary_mechanism` for present flat trees and runs
 `nuclear_exit` only when explicit Stage B exit branches are present. Edit the
@@ -23,7 +38,7 @@ uncertainties:
 
 analysis/run_expected_event_yields.sh analysis/output/matrix/generator_matrix_status.csv analysis/output/expected_event_yields
 
-This scans the generator-matrix flat ntuples with the `ana` final-state rule:
+This scans the generator-matrix flat ntuples with the analysis final-state rule:
 final-state PDG in {3122,3212,3322,3312,3334}, with no momentum threshold. It
 applies the species-aware normalized NuMI flux reweight over the flat 0-10 GeV
 proposal, writes a per-variation yield table, and writes two uncertainty
@@ -125,8 +140,8 @@ The coverage plotter is implemented as `AnaCoverage::CoveragePlotter` in
 `analysis/coverage_plotter.cxx`, with old-jobcard-style entry points
 `analysis/plot_kinematic_coverage.cxx` and `analysis/plot_enu_q2_coverage.cxx`.
 It draws 70%, 90%, and 99% highest-density weighted-yield contours like the old
-`jobcards/numi/analysis` coverage macros, but it reads the generator-matrix
-status CSV and defaults to the `ana` final-state hyperon rule: final-state PDG
+NuMI coverage macros, but it reads the generator-matrix status CSV and defaults
+to the analysis final-state hyperon rule: final-state PDG
 in {3122,3212,3322,3312,3334}, with no momentum threshold where FlatTree
 final-state PDGs are available. It also applies the normalized NuMI flux
 reweight over the flat 0-10 GeV proposal by default. Pass an explicit
@@ -161,7 +176,7 @@ Nuclear-exit migration study for one reduced ntuple sample:
 
 root -l -b -q 'analysis/nuclear_exit.cxx+("path/to/reduced.flat.root","analysis/output","sample_label","GENIE","nominal","example/numi/flux/microboone_numi_flux_5mev.root",0.0,"fhc",0.0,10.0,"numu")'
 
-Use the beam-polarity argument as "fhc", "rhc", or "combined", and pass an optional final beam-species argument as "numu" or "numubar". The matrix loop passes this from `ana/config/generator_loop_plan.tsv`, so FHC numubar and RHC numu rows use the matching species-specific NuMI flux histograms. The current generator-production strategy is flat in E_nu over 0-10 GeV, so the macros also apply a normalized NuMI flux reweight over that flat proposal range. Optional final arguments can override the proposal range, for example `..., "fhc", 0.0, 10.0, "numu"`.
+Use the beam-polarity argument as "fhc", "rhc", or "combined", and pass an optional final beam-species argument as "numu" or "numubar". The matrix loop passes this from `analysis/config/generator_loop_plan.tsv`, so FHC numubar and RHC numu rows use the matching species-specific NuMI flux histograms. The current generator-production strategy is flat in E_nu over 0-10 GeV, so the macros also apply a normalized NuMI flux reweight over that flat proposal range. Optional final arguments can override the proposal range, for example `..., "fhc", 0.0, 10.0, "numu"`.
 
 Outputs:
 
