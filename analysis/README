@@ -15,6 +15,21 @@ Run a first 100-proposal-event sample-matrix smoke production and core macro tes
 
 events=100 analysis/run_pipeline_smoke.sh
 
+Run the first production milestone, which generates 10,000 proposal events in
+each active full-matrix sample and stops before the derived analysis steps:
+
+analysis/run_milestone_10k.sh
+
+That wrapper is just:
+
+analysis/run_pipeline.sh analysis/config/milestone_10k.env
+
+Set `run_analysis=1` with the same config after the 10k flat files exist to run
+the generator matrix, expected-yield tables, and phenomenology-sensitivity
+summary over those samples:
+
+run_analysis=1 produce_samples=0 analysis/run_pipeline.sh analysis/config/milestone_10k.env
+
 This expands the three-sample smoke plan in
 `analysis/config/generator_smoke_plan.tsv`, writes one FHC numu proxy flat for
 each generator, then runs the generator matrix, expected-yield, and
