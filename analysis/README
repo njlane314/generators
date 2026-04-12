@@ -29,8 +29,13 @@ comparable to GENIE and NuWro for the same `events`.  Set `run_plots=1` to also
 exercise the
 kinematic-envelope and coverage plot macros.  Use
 `plan=analysis/config/generator_loop_plan.tsv` only when you want the full
-60-sample matrix.  Set `dry_run=1` on `analysis/run_sample_matrix.sh` to print
-the proposal sample list without running generators.
+60-row analysis matrix.  The full plan now uses FHC/RHC beam reweighting for
+GENIE and NuWro: RHC analysis rows read the FHC-generated flat proposal and
+apply the RHC NuMI flux reweight downstream.  GiBUU remains beam-specific
+because `PrepareGiBUU` receives the beam flux during flat preparation.  With the
+current full plan this means 60 analysis rows but 34 generated flat samples.
+Set `dry_run=1` on `analysis/run_sample_matrix.sh` to print the proposal sample
+list without running generators.
 
 These are analysis-local copies of the example generator runners with paths
 updated to use `analysis/flux` for the NuMI reweight target, keep the
@@ -191,7 +196,7 @@ Nuclear-exit migration study for one reduced ntuple sample:
 
 root -l -b -q 'analysis/nuclear_exit.cxx+("path/to/reduced.flat.root","analysis/output","sample_label","GENIE","nominal","analysis/flux/microboone_numi_flux_5mev.root",0.0,"fhc",0.0,10.0,"numu")'
 
-Use the beam-polarity argument as "fhc", "rhc", or "combined", and pass an optional final beam-species argument as "numu" or "numubar". The matrix loop passes this from `analysis/config/generator_loop_plan.tsv`, so FHC numubar and RHC numu rows use the matching species-specific NuMI flux histograms. The current generator-production strategy is flat in E_nu over 0-10 GeV, so the macros also apply a normalized NuMI flux reweight over that flat proposal range. Optional final arguments can override the proposal range, for example `..., "fhc", 0.0, 10.0, "numu"`.
+Use the beam-polarity argument as "fhc", "rhc", or "combined", and pass an optional final beam-species argument as "numu" or "numubar". The matrix loop passes this from `analysis/config/generator_loop_plan.tsv`, so FHC numubar and RHC numu rows use the matching species-specific NuMI flux histograms. The current GENIE and NuWro production strategy is flat in E_nu over 0-10 GeV and beam-independent, so the full plan uses the same generated flat proposal for FHC and RHC and lets these macros apply the normalized NuMI flux reweight. GiBUU rows are still prepared separately by beam. Optional final arguments can override the proposal range, for example `..., "fhc", 0.0, 10.0, "numu"`.
 
 Outputs:
 

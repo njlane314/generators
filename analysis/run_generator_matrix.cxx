@@ -138,12 +138,23 @@ TString beam_polarity_from_mode(TString beam_mode)
     return beam_mode;
 }
 
+TString generation_beam_mode_for(const TString& generator, TString beam_mode)
+{
+    TString gen = generator;
+    gen.ToLower();
+    TString mode = beam_mode;
+    mode.ToLower();
+    if ((gen == "genie" || gen == "nuwro") && (mode == "fhc" || mode == "rhc")) return "FHC";
+    return beam_mode;
+}
+
 TString replace_tokens(
     TString text,
     const TString& generator,
     const TString& version,
     const TString& knob,
     const TString& beam_mode,
+    const TString& generation_beam_mode,
     const TString& beam_species,
     const TString& interaction,
     const TString& fsi_state
@@ -153,6 +164,7 @@ TString replace_tokens(
     text.ReplaceAll("{version}", version);
     text.ReplaceAll("{knob}", knob);
     text.ReplaceAll("{beam_mode}", beam_mode);
+    text.ReplaceAll("{generation_beam_mode}", generation_beam_mode);
     text.ReplaceAll("{beam_species}", beam_species);
     text.ReplaceAll("{interaction}", interaction);
     text.ReplaceAll("{fsi_state}", fsi_state);
@@ -246,6 +258,7 @@ std::vector<expanded_row> expand_plan(const std::vector<plan_row>& plan)
         for (const TString& version : row.versions) {
             for (const TString& knob : row.knobs) {
                 for (const TString& beam_mode : row.beam_modes) {
+                    const TString generation_beam_mode = generation_beam_mode_for(row.generator, beam_mode);
                     for (const TString& beam_species : row.beam_species) {
                         for (const TString& interaction : row.interactions) {
                             for (const TString& fsi_state : row.fsi_states) {
@@ -258,9 +271,9 @@ std::vector<expanded_row> expand_plan(const std::vector<plan_row>& plan)
                                 item.beam_species = beam_species;
                                 item.interaction = interaction;
                                 item.fsi_state = fsi_state;
-                                item.input_file = replace_tokens(row.input_template, row.generator, version, knob, beam_mode, beam_species, interaction, fsi_state);
-                                item.sample_label = replace_tokens(row.sample_template, row.generator, version, knob, beam_mode, beam_species, interaction, fsi_state);
-                                item.variation = replace_tokens(row.variation_template, row.generator, version, knob, beam_mode, beam_species, interaction, fsi_state);
+                                item.input_file = replace_tokens(row.input_template, row.generator, version, knob, beam_mode, generation_beam_mode, beam_species, interaction, fsi_state);
+                                item.sample_label = replace_tokens(row.sample_template, row.generator, version, knob, beam_mode, generation_beam_mode, beam_species, interaction, fsi_state);
+                                item.variation = replace_tokens(row.variation_template, row.generator, version, knob, beam_mode, generation_beam_mode, beam_species, interaction, fsi_state);
                                 if (item.variation == "") item.variation = knob;
                                 item.run_primary = row.run_primary;
                                 item.run_nuclear_exit = row.run_nuclear_exit;

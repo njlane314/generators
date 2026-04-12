@@ -13,6 +13,10 @@ max_samples="${max_samples:-0}"
 seed_base="${seed_base:-1000}"
 gibuu_events_per_ensemble="${gibuu_events_per_ensemble:-5}"
 proposal_events="${events}"
+generated_output_paths=""
+generated_runs=0
+reused_runs=0
+skipped_runs=0
 
 case "${proposal_events}" in
   ''|*[!0-9]*) printf 'ERROR: events must be a positive integer proposal-event count\n' >&2; exit 1 ;;
@@ -36,15 +40,48 @@ split_csv() {
   printf '%s\n' "${value}" | tr ',' '\n'
 }
 
+canonical_generation_beam_mode() {
+  local gen="$1"
+  local mode="$2"
+  local lower_gen
+  local lower_mode
+  lower_gen="$(printf '%s' "${gen}" | tr '[:upper:]' '[:lower:]')"
+  lower_mode="$(printf '%s' "${mode}" | tr '[:upper:]' '[:lower:]')"
+
+  case "${lower_gen}:${lower_mode}" in
+    genie:fhc|genie:rhc|nuwro:fhc|nuwro:rhc) printf '%s\n' FHC ;;
+    *) printf '%s\n' "${mode}" ;;
+  esac
+}
+
 expand_template() {
   local text="$1"
   text="${text//\{version\}/${version}}"
   text="${text//\{knob\}/${knob}}"
   text="${text//\{beam_mode\}/${beam_mode}}"
+  text="${text//\{generation_beam_mode\}/${generation_beam_mode}}"
   text="${text//\{beam_species\}/${species}}"
   text="${text//\{interaction\}/${interaction}}"
   text="${text//\{fsi_state\}/${fsi_state}}"
   printf '%s\n' "${text}"
+}
+
+sample_label_from_output_path() {
+  local name
+  name="$(basename "$1")"
+  name="${name%.root}"
+  name="${name%.flat}"
+  printf '%s\n' "${name}"
+}
+
+has_generated_output_path() {
+  local path="$1"
+  printf '%s' "${generated_output_paths}" | grep -Fx -- "${path}" >/dev/null 2>&1
+}
+
+mark_generated_output_path() {
+  generated_output_paths="${generated_output_paths}${1}
+"
 }
 
 run_generator_sample() {
@@ -62,7 +99,7 @@ run_generator_sample() {
       events="${proposal_events}" \
       version="${version}" \
       tune="${knob}" \
-      beam_mode="${beam_mode}" \
+      beam_mode="${generation_beam_mode}" \
       beam_species="${species}" \
       interaction="${interaction}" \
       run="$((seed_base + n))" \
@@ -78,7 +115,7 @@ run_generator_sample() {
       seed="$((seed_base + n))" \
       version="${version}" \
       knob="${knob}" \
-      beam_mode="${beam_mode}" \
+      beam_mode="${generation_beam_mode}" \
       beam_species="${species}" \
       interaction="${interaction}" \
       fsi_state="${fsi_state}" \
@@ -95,7 +132,7 @@ run_generator_sample() {
       num_runs_same_energy="${num_runs_same_energy:-1}" \
       version="${version}" \
       knob="${knob}" \
-      beam_mode="${beam_mode}" \
+      beam_mode="${generation_beam_mode}" \
       beam_species="${species}" \
       interaction="${interaction}" \
       fsi_state="${fsi_state}" \
@@ -115,12 +152,22 @@ run_generator_sample() {
 
 run_sample() {
   local n="$1"
-  local output_path sample_label selected_count_path selected note
+  local output_path sample_label generation_sample_label selected_count_path selected note
   output_path="${repo_root}/$(expand_template "${input_template}")"
   sample_label="$(expand_template "${sample_template}")"
-  selected_count_path="${repo_root}/analysis/output/work/${generator}/${sample_label}/${sample_label}.selected.count"
+  generation_sample_label="$(sample_label_from_output_path "${output_path}")"
+  selected_count_path="${repo_root}/analysis/output/work/${generator}/${generation_sample_label}/${generation_sample_label}.selected.count"
+
+  if has_generated_output_path "${output_path}"; then
+    reused_runs=$((reused_runs + 1))
+    printf 'reuse beam-reweighted [%04d] %s analysis_beam=%s generation_beam=%s input=%s sample=%s\n' \
+      "${n}" "${generator}" "${beam_mode}" "${generation_beam_mode}" "${output_path}" "${sample_label}"
+    return 0
+  fi
 
   if [ "${skip_existing}" = 1 ] && [ -s "${output_path}" ]; then
+    mark_generated_output_path "${output_path}"
+    skipped_runs=$((skipped_runs + 1))
     printf 'skip existing [%04d] %s\n' "${n}" "${output_path}"
     return 0
   fi
@@ -133,22 +180,26 @@ run_sample() {
       note=" corrected_num_ensembles=$(( (proposal_events + gibuu_events_per_ensemble - 1) / gibuu_events_per_ensemble ))"
     fi
   fi
-  printf 'sample [%04d] %s version=%s knob=%s beam=%s species=%s interaction=%s fsi=%s proposal_events=%s%s\n' \
-    "${n}" "${generator}" "${version}" "${knob}" "${beam_mode}" "${species}" "${interaction}" "${fsi_state}" "${proposal_events}" "${note}"
+  printf 'sample [%04d] %s version=%s knob=%s analysis_beam=%s generation_beam=%s species=%s interaction=%s fsi=%s proposal_events=%s%s\n' \
+    "${n}" "${generator}" "${version}" "${knob}" "${beam_mode}" "${generation_beam_mode}" "${species}" "${interaction}" "${fsi_state}" "${proposal_events}" "${note}"
 
   if [ "${dry_run}" = 1 ]; then
+    mark_generated_output_path "${output_path}"
+    generated_runs=$((generated_runs + 1))
     return 0
   fi
 
-  rm -rf "${repo_root}/analysis/output/work/${generator}/${sample_label}"
-  run_generator_sample "${n}" "${sample_label}" "${output_path}" "${selected_count_path}"
+  rm -rf "${repo_root}/analysis/output/work/${generator}/${generation_sample_label}"
+  run_generator_sample "${n}" "${generation_sample_label}" "${output_path}" "${selected_count_path}"
 
   [ -s "${selected_count_path}" ] || { printf 'ERROR: missing selected-event count: %s\n' "${selected_count_path}" >&2; exit 1; }
   selected="$(cat "${selected_count_path}")"
   case "${selected}" in
     ''|*[!0-9]*) printf 'ERROR: invalid selected-event count in %s: %s\n' "${selected_count_path}" "${selected}" >&2; exit 1 ;;
   esac
-  printf 'selected [%04d] %s: %s/%s proposal events -> %s\n' "${n}" "${sample_label}" "${selected}" "${proposal_events}" "${output_path}"
+  mark_generated_output_path "${output_path}"
+  generated_runs=$((generated_runs + 1))
+  printf 'selected [%04d] %s: %s/%s proposal events -> %s\n' "${n}" "${generation_sample_label}" "${selected}" "${proposal_events}" "${output_path}"
 }
 
 [ -r "${plan}" ] || { printf 'ERROR: missing plan: %s\n' "${plan}" >&2; exit 1; }
@@ -167,6 +218,7 @@ while IFS=$'\t' read -r enabled generator versions knobs beam_modes beam_species
         for species in $(split_csv "${beam_species}"); do
           for interaction in $(split_csv "${interactions}"); do
             for fsi_state in $(split_csv "${fsi_states}"); do
+              generation_beam_mode="$(canonical_generation_beam_mode "${generator}" "${beam_mode}")"
               count=$((count + 1))
               if [ "${max_samples}" -gt 0 ] && [ "${count}" -gt "${max_samples}" ]; then
                 printf 'stopped after max_samples=%s\n' "${max_samples}"
@@ -181,4 +233,7 @@ while IFS=$'\t' read -r enabled generator versions knobs beam_modes beam_species
   done
 done < <(tail -n +2 "${plan}")
 
-printf 'matrix samples considered: %d\n' "${count}"
+printf 'matrix analysis samples considered: %d\n' "${count}"
+printf 'matrix generation samples run: %d\n' "${generated_runs}"
+printf 'matrix generation samples reused: %d\n' "${reused_runs}"
+printf 'matrix generation samples skipped existing: %d\n' "${skipped_runs}"
