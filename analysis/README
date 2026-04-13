@@ -1,257 +1,186 @@
-Lambda analyzer
+Lambda Generator Comparison
+===========================
 
-Run the generator loop from the repository root:
+Scope
+-----
 
-root -l -b -q analysis/loop_generators.cxx
+This directory is for one workflow:
 
-Make local proxy flat samples from the repository root:
+1. Produce 10,000-event local NuWro and GiBUU samples.
+2. Produce larger GENIE samples on the FNAL grid.
+3. Convert every generator output to the same NUISANCE `FlatTree_VARS` ntuple
+   shape, then keep the Lambda-topology analysis subset.
+4. Run the common matrix/yield analyser and publication plotters.
+5. Compare generator models, phase-space regions, expected MicroBooNE event
+   yields, and FSI/transport-model differences.
 
-analysis/run_genie.sh
-analysis/run_nuwro.sh
-analysis/run_gibuu.sh
-analysis/run_all.sh
+The analysis sample manifest is `analysis/share/config/sample_matrix.tsv`.
+Generated analysis ntuples are expected under
+`analysis/output/nuisance_flat/<generator>`.
 
-Run the local 10,000 proposal-event generation for each active full-matrix
-sample:
+Layout
+------
 
-analysis/run_milestone_10k.sh
+`analysis/bin` contains user-facing commands.
 
-Equivalently, the default pipeline now does the same local generation-only
-run:
+`analysis/lib` contains reusable shell code.
 
-analysis/run_pipeline.sh
+`analysis/libexec/root` contains ROOT/C++ implementation macros, grouped by
+task: `matrix`, `yields`, `envelopes`, `coverage`, and `ntuples`.
 
-Check the full 44-sample local generation list without running generators:
+`analysis/share` contains static cards, flux files, manifests, and cached
+GENIE splines.
 
-dry_run=1 analysis/run_pipeline.sh
+`analysis/output` contains generated samples, intermediate work, plots, and
+tables.
 
-Set `run_analysis=1` with the same config after the 10k flat files exist to run
-the generator matrix, expected-yield tables, and phenomenology-sensitivity
-summary over those samples:
+Beam Envelope
+-------------
 
-run_analysis=1 produce_samples=0 analysis/run_pipeline.sh analysis/config/milestone_10k.env
+The production-time beam envelope is the generated neutrino-energy range. It is
+applied before flattening by the generator wrappers:
 
-This expands `analysis/config/generator_loop_plan.tsv`, which is the full
-44-row analysis matrix. `events` is the fixed proposal exposure per
-configuration. The sample matrix runner generates each inclusive flat sample
-once, skims final-state hyperons from that proposal, and lets the selected count
-float; downstream yield tables carry the resulting statistical uncertainty.
-GiBUU corrects `numEnsembles` by `gibuu_events_per_ensemble=5` by default so its
-proposal flat-tree entry count is comparable to GENIE and NuWro for the same
-`events`. Set `run_plots=1` when running the derived analysis to also exercise
-the kinematic-envelope and coverage plot macros. The sample runners generate
-directly from the matching NuMI flux for each FHC/RHC and species row; the
-matrix and yield steps then use the generated sample weights and the configured
-analysis energy window.
+```
+beam_energy_min_gev=0 beam_energy_max_gev=10 analysis/bin/milestone_10k.sh
+```
 
-These are analysis-local copies of the example generator runners with paths
-updated to use `analysis/flux` as the generator-time NuMI flux input and write flat outputs into
-`analysis/output/proxy_flat/<generator>`.  Matrix production always writes final
-outputs selected by `analysis/skim_final_state_hyperon.cxx`, requiring at least
-one final-state Lambda, Sigma0, Xi0, Xi-, or Omega- with no momentum cut.
+The same values default the downstream analysis window. Override
+`analysis_energy_min_gev` and `analysis_energy_max_gev` only when studying a
+subrange of already-produced samples.
 
-The loop is manifest-driven by `analysis/config/generator_loop_plan.tsv`. It expands
-generator, version, knob/config, beam mode, beam species, interaction, and FSI
-state lists, skips missing files, and writes
-`analysis/output/matrix/generator_matrix_status.csv`.
+Local NuWro/GiBUU Samples
+------------------------
 
-Equivalent explicit call:
+Check the local 10,000-event production list:
 
-analysis/run_generator_matrix.sh analysis/config/generator_loop_plan.tsv analysis/output/matrix
+```
+dry_run=1 analysis/bin/milestone_10k.sh
+```
 
-The default loop runs `primary_mechanism` for present flat trees and runs
-`nuclear_exit` only when explicit Stage B exit branches are present. Edit the
-plan file's `input_template`, `sample_template`, and run flags when moving from
-proxy flats to reduced analysis flats.
+Run local production:
 
-First make expected event-yield tables with statistical and systematic
-uncertainties:
+```
+analysis/bin/milestone_10k.sh
+```
 
-analysis/run_expected_event_yields.sh analysis/output/matrix/generator_matrix_status.csv analysis/output/expected_event_yields
+`milestone_10k.sh` uses `analysis/share/config/milestone_10k.env`, which sets
+`generator_filter=NuWro,GiBUU`. GENIE is intentionally not part of the local
+milestone. The local wrappers run the generator, call `nuisflat`, then run the
+common analysis-ntuple pass.
 
-This scans the generator-matrix flat ntuples with the analysis final-state rule:
-final-state PDG in {3122,3212,3322,3312,3334}, with no momentum threshold. The
-default samples are already generated from the matching NuMI flux, so this step
-uses the generated event weights directly. It writes
-a per-variation yield table and two uncertainty
-summaries: one that envelopes version/knob variations at fixed FSI state and
-one that also envelopes FSI-state differences. It also writes generator
-envelope yield summaries that hold beam mode/species and interaction fixed,
-then vary generator, version, tune/configuration, knob, and optionally FSI
-state. The `expected_events` column is scaled by the optional final
-`EXPOSURE_SCALE` argument. With the default scale of 1, it is a unit-normalized
-analysis yield; pass an exposure/POT/target scale when absolute detector event
-counts are needed.
+GENIE Splines
+-------------
 
-The expected-yields macro also writes fast detector-envelope categories. These
-leave the final-state generator sample definition untouched, then correct the
-event weights for Lambda reachability, the Lambda -> p pi- branching ratio
-0.639, and the probability that the Lambda-decay proton and pi- pass the
-visible momentum thresholds. The default thresholds are p_p > 0.30 GeV and
-p_pi_minus > 0.07 GeV, and can be overridden with the wrapper arguments:
+`analysis/bin/generate_genie.sh` can create a missing spline locally with
+`make_spline=auto`. For grid production, prebuild every configured spline after
+sourcing `setup_generators.sh`:
 
-analysis/run_expected_event_yields.sh analysis/output/matrix/generator_matrix_status.csv analysis/output/expected_event_yields 1.0 0.30 0.07 0.0 10.0
+```
+mkdir -p analysis/share/splines
+for probe in 14 -14; do
+  for tune in AR23_20i_00_000 G18_10a_02_11a G18_10b_02_11a G18_10a_02_11b G18_10b_02_11b; do
+    gmkspl -p "${probe}" -t 1000180400 -e 10. \
+      -o "analysis/share/splines/${probe}_1000180400_CC_v3_6_2_${tune}.xml" \
+      --tune "${tune}" --event-generator-list CC
+  done
+done
+```
 
-This is a truth-level decay/threshold envelope. It does not replace the later
-full geometry, containment, detached-vertex, and Stage C/D reduced-ntuple
-envelope. Parent-seeded detector-envelope rows are composition rows and can
-overlap; use `detector_visible_Lambda_to_p_piminus` as the inclusive corrected
-event-yield row.
+Regenerate the XML when the probe, target, interaction list, GENIE version,
+tune/model setup, or beam-energy envelope changes.
 
-Then test phenomenological yield sensitivity to generator model choices:
+GENIE Grid Samples
+------------------
 
-analysis/run_phenomenology_sensitivity.sh analysis/output/expected_event_yields/expected_event_yields_by_variation.csv analysis/output/phenomenology_sensitivity
+Expand the GENIE rows in the sample manifest into jobsub submissions:
 
-This is a small AWK post-processor over the per-variation yield table. It uses
-the detector-visible category by default and groups at fixed beam mode/species.
-The summary table reports whether the yield envelope is large relative to the
-central row or its statistical uncertainty. The member table reports the yield
-shift if a variation is favoured and the leave-one-out envelope contraction if
-that variation is excluded. Use the fourth argument to change the grouping:
-`beam`, `beam_envelope`, `all_beam`, or `generator`. The wrapper also writes a
-ranked-impact SVG plot (`*_ranked_impacts.svg`) that sorts the largest signed
-fractional yield shifts, colors them by model axis, and annotates the
-statistical pull. Rerun just the plot from an existing members table with:
+```
+dry_run=1 jobs_per_sample=10 events_per_job=200000 \
+  analysis/bin/submit_genie_grid_samples.sh
+```
 
-analysis/plot_phenomenology_sensitivity.sh analysis/output/phenomenology_sensitivity/detector_visible_Lambda_to_p_piminus_beam_members.tsv
+Submit them on a uboone GPVM:
 
-Then make the FHC/RHC kinematic beam envelope:
+```
+jobs_per_sample=10 events_per_job=200000 analysis/bin/submit_genie_grid_samples.sh
+```
 
-analysis/run_beam_kinematic_envelope.sh analysis/output/matrix/generator_matrix_status.csv analysis/output/beam_kinematic_envelope
+The submitter writes `analysis/output/grid/genie/submissions.tsv`, copies
+`production/genie_grid.sh` to `grid_resources_dir`, and uses
+`production/submit_genie.sh`. Defaults are:
 
-This groups samples by generator, version, variation, knob, beam species,
-interaction, and FSI state, then overlays the FHC and RHC NuMI-beam kinematic
-spectra. The default variables are `enu q2 w hyperon_p`, and the
-default selection is the detector-visible Lambda envelope above. Each output
-has a shaded per-bin FHC/RHC envelope plus a CSV table with FHC yield, RHC
-yield, min/max envelope, and RHC/FHC ratio. Change the selection with the
-fourth argument, for example `final_hyperon` or `detector_branching`.
+```
+grid_checkout=R-3_06_02
+grid_output_base=/pnfs/uboone/persistent/users/$(whoami)/genie_grid
+grid_resources_dir=/pnfs/uboone/persistent/users/$(whoami)/grid
+```
 
-Then make the generator/configuration kinematic envelope:
+After grid jobs return, flatten each sample into its manifest target. Example:
 
-analysis/run_generator_kinematic_envelope.sh analysis/output/matrix/generator_matrix_status.csv analysis/output/generator_kinematic_envelope
+```
+beam_mode=FHC beam_species=numu \
+  analysis/bin/flatten_genie_grid_outputs.sh \
+  analysis/output/nuisance_flat/GENIE/GENIE_3.6.2_NuMI_FHC_numu_CC_all_strange_filter_AR23_20i_00_000.flat.root \
+  /pnfs/uboone/persistent/users/$(whoami)/genie_grid/GENIE_3.6.2_NuMI_FHC_numu_CC_all_strange_filter_AR23_20i_00_000/*.ghep.root
+```
 
-This holds beam mode, beam species, and interaction fixed, then envelopes the
-generator, version, tune/configuration, knob, and FSI-state variations. The
-default selection and variables match the beam envelope. The final optional
-`FIX_FSI` argument defaults to `false`; set it to `true` to compare generator,
-version, configuration, and knob variations at fixed FSI state instead of
-enveloping FSI on/off together.
+Common Analysis Pass
+--------------------
 
-Then make generator comparison plots:
+Run the matrix analyser and expected-yield tables after the NuWro/GiBUU local
+ntuples and GENIE grid ntuples exist:
 
-root -l -b -q 'analysis/generator_overlay.cxx'
+```
+run_analysis=1 produce_samples=0 analysis/bin/pipeline.sh analysis/share/config/milestone_10k.env
+```
 
-For the manifest-driven matrix outputs, use:
+The pipeline writes:
 
-analysis/plot_generator_matrix.sh analysis/output/matrix/generator_matrix_status.csv analysis/output/matrix analysis/output/matrix/plots
+```
+analysis/output/milestone_10k/matrix/generator_matrix_status.csv
+analysis/output/milestone_10k/expected_event_yields/expected_event_yields_by_variation.csv
+analysis/output/milestone_10k/expected_event_yields/expected_event_yields_uncertainties.csv
+analysis/output/milestone_10k/expected_event_yields/expected_event_yields_generator_envelope.csv
+```
 
-This makes primary-mechanism and nuclear-exit overlays grouped by variation,
-beam, and generator, plus per-sample 2D maps where the corresponding ROOT
-objects exist. The legacy `generator_overlay.cxx` entry point now delegates to
-this matrix plotter.
+To build a common analysis ntuple explicitly from existing NUISANCE flat files:
 
-Then make old-jobcard-style kinematic coverage contours:
+```
+analysis/bin/build_analysis_ntuple.sh output.flat.root input1.flat.root input2.flat.root
+```
 
-analysis/run_kinematic_coverage.sh analysis/output/matrix/generator_matrix_status.csv analysis/output/coverage "variation beam generator"
+Add custom per-analysis variables in
+`analysis/libexec/root/ntuples/build_analysis_ntuple.cxx` when they are needed.
 
-The same coverage plotter can run through detector-visibility assumptions:
+Plotters
+--------
 
-analysis/run_detector_visibility_coverage.sh analysis/output/matrix/generator_matrix_status.csv analysis/output/coverage/detector_visibility "variation beam generator"
+Publication comparison plots from the matrix outputs:
 
-The default detector-visibility set makes coverage plots for the raw final
-hyperon selection, branching-only Lambda reachability, and loose/nominal/tight
-visible Lambda -> p pi- daughter momentum thresholds. It writes one directory
-per assumption plus `detector_visibility_coverage_assumptions.tsv`. To scan
-custom assumptions, pass a comma-separated list of
-`label:selection:proton_threshold:piminus_threshold` entries as the sixth
-argument, for example
-`nom:detector_visible_lambda:0.30:0.07,tight:detector_visible_lambda:0.45:0.12`.
+```
+analysis/bin/plot_generator_matrix.sh \
+  analysis/output/milestone_10k/matrix/generator_matrix_status.csv \
+  analysis/output/milestone_10k/matrix \
+  analysis/output/milestone_10k/matrix/plots
+```
 
-For the E_nu-vs-Q2 shortcut:
+Phase-space plots:
 
-analysis/run_enu_q2_coverage.sh analysis/output/matrix/generator_matrix_status.csv analysis/output/coverage/enu_q2 "variation beam generator"
+```
+analysis/bin/plot_kinematic_coverage.sh \
+  analysis/output/milestone_10k/matrix/generator_matrix_status.csv \
+  analysis/output/milestone_10k/phase_space \
+  "variation beam generator" coverage "enu_q2 q2_w enu_lambda_p w_lambda_p lambda_p_costheta" final_hyperon
+```
 
-The coverage plotter is implemented as `AnaCoverage::CoveragePlotter` in
-`analysis/coverage_plotter.cxx`, with old-jobcard-style entry points
-`analysis/plot_kinematic_coverage.cxx` and `analysis/plot_enu_q2_coverage.cxx`.
-It draws 70%, 90%, and 99% highest-density weighted-yield contours like the old
-NuMI coverage macros, but it reads the generator-matrix status CSV and defaults
-to the analysis final-state hyperon rule: final-state PDG
-in {3122,3212,3322,3312,3334}, with no momentum threshold where FlatTree
-final-state PDGs are available. Pass an explicit
-comma-separated ROOT-file list instead of the status CSV to compare custom
-files; in that mode the third argument is a matching comma-separated label
-list. For detector-visibility selections, the contour weights are additionally
-multiplied by the fast truth-level Lambda reachability, Lambda -> p pi-
-branching ratio, and daughter-threshold acceptance used in the yield and
-kinematic-envelope macros.
+Generator/configuration envelope plots:
 
-For one file:
+```
+analysis/bin/plot_generator_kinematic_envelope.sh \
+  analysis/output/milestone_10k/matrix/generator_matrix_status.csv \
+  analysis/output/milestone_10k/generator_kinematic_envelope
+```
 
-root -l
-root [0] .L analysis/analyser.cxx+
-root [1] analyser("path/to/sample.flat.root", "sample_label").loop()
-
-Primary mechanism study for one inclusive Lambda-topology sample:
-
-root -l -b -q 'analysis/primary_mechanism.cxx+("path/to/inclusive.flat.root","analysis/output","sample_label","GENIE","nominal","nominal","fhc",0.0,10.0,"numu")'
-
-Nuclear-exit migration study for one reduced ntuple sample:
-
-root -l -b -q 'analysis/nuclear_exit.cxx+("path/to/reduced.flat.root","analysis/output","sample_label","GENIE","nominal","fhc",0.0,10.0,"numu")'
-
-Use the beam-polarity argument as "fhc", "rhc", or "combined", and pass an optional final beam-species argument as "numu" or "numubar". The matrix loop passes this from `analysis/config/generator_loop_plan.tsv`. Optional final arguments can override the analysis energy window, for example `..., "fhc", 0.0, 10.0, "numu"`.
-
-Outputs:
-
-analysis/output/lambda_analyser_<sample_label>.root
-analysis/output/overlay_*.pdf
-analysis/output/map_*.pdf
-analysis/output/topology_yields.csv
-analysis/output/topology_yields_uncertainties.csv
-analysis/output/matrix/generator_matrix_status.csv
-analysis/output/expected_event_yields/expected_event_yields_by_variation.csv
-analysis/output/expected_event_yields/expected_event_yields_uncertainties.csv
-analysis/output/expected_event_yields/expected_event_yields_uncertainties_all_variations.csv
-analysis/output/expected_event_yields/expected_event_yields_generator_envelope_fixed_fsi.csv
-analysis/output/expected_event_yields/expected_event_yields_generator_envelope.csv
-analysis/output/expected_event_yields/expected_event_yields_summary.md
-analysis/output/phenomenology_sensitivity/*_summary.tsv
-analysis/output/phenomenology_sensitivity/*_members.tsv
-analysis/output/phenomenology_sensitivity/*_axes.tsv
-analysis/output/phenomenology_sensitivity/*_ranked_impacts.svg
-analysis/output/phenomenology_sensitivity/*_README.txt
-analysis/output/beam_kinematic_envelope/beam_kinematic_envelope_summary.csv
-analysis/output/beam_kinematic_envelope/beam_envelope_*.csv
-analysis/output/beam_kinematic_envelope/beam_envelope_*.pdf
-analysis/output/beam_kinematic_envelope/beam_envelope_*.png
-analysis/output/generator_kinematic_envelope/generator_kinematic_envelope_summary.csv
-analysis/output/generator_kinematic_envelope/generator_envelope_*.csv
-analysis/output/generator_kinematic_envelope/generator_envelope_*.pdf
-analysis/output/generator_kinematic_envelope/generator_envelope_*.png
-analysis/output/matrix/plots/<primary_or_exit>/<comparison_loop>/*.pdf
-analysis/output/matrix/plots/<primary_or_exit>/<comparison_loop>/*.png
-analysis/output/matrix/plots/<primary_or_exit>/maps/*.pdf
-analysis/output/matrix/plots/<primary_or_exit>/maps/*.png
-analysis/output/coverage/<comparison_loop>/coverage_*.pdf
-analysis/output/coverage/<comparison_loop>/coverage_*.png
-analysis/output/coverage/detector_visibility/detector_visibility_coverage_assumptions.tsv
-analysis/output/coverage/detector_visibility/<assumption>/<comparison_loop>/coverage_*.pdf
-analysis/output/coverage/detector_visibility/<assumption>/<comparison_loop>/coverage_*.png
-analysis/output/primary_mechanism_<sample_label>_<beam_polarity>.root
-analysis/output/primary_mechanism_<sample_label>_<beam_polarity>_summary.csv
-analysis/output/primary_mechanism_<sample_label>_<beam_polarity>_origin_mode.csv
-analysis/output/primary_mechanism_<sample_label>_<beam_polarity>_raw_mode.csv
-analysis/output/nuclear_exit_<sample_label>_<beam_polarity>.root
-analysis/output/nuclear_exit_<sample_label>_<beam_polarity>_summary.csv
-analysis/output/nuclear_exit_<sample_label>_<beam_polarity>_migration.csv
-analysis/output/nuclear_exit_<sample_label>_<beam_polarity>_raw_exit_pdg.csv
-
-This is a first pass over NUISANCE FlatTree_VARS. It uses pdg_vert for primary strange content, final state pdg for final Lambda content, and a p plus pi-minus proxy requiring primary or final hyperon evidence for S0.
-
-The primary mechanism macro keeps the Lambda-topology sample inclusive, then reports the selected sample by primary strange origin and generator Mode category with sample, generator, knob, beam_polarity, and statistical uncertainty columns. It restricts reported counts and spectra to the analysis energy window without changing generated event weights. If reduced topology flags such as topology_nominal_flag or fiducial_vertex_flag are not present, it falls back to a FlatTree proxy requiring final-state Lambda plus visible-proxy proton and pi-minus, and prints that caveat in the ROOT metadata and terminal output.
-
-The nuclear-exit macro uses the same energy-window handling and writes sample, generator, knob, and beam_polarity columns. It requires explicit Stage B branches such as n_exitp plus pdg_exit, or nuclear_exit_n plus nuclear_exit_pdg, and it refuses to use final-state pdg as a nuclear-exit proxy.
-
-The detached Lambda topology still needs the reduced ntuple fields from CONTEXT: nuclear-exit strange species, Lambda decay vertex, daughter ancestry, fiducial flags, decay length, and truth-visible containment flags.
+Transport-model comparisons are driven by the `fsi_on` and `fsi_off` rows in
+`analysis/share/config/sample_matrix.tsv`; the matrix status CSV and plotters
+keep the `fsi_state` in the sample and variation labels.

@@ -1,35 +1,40 @@
-Run these commands on the FNAL gpvms.
+Generator Study
+===============
 
-Clone the repository:
+Run on an FNAL GPVM inside the uboone container:
 
+```
 git clone https://github.com/njlane314/generators.git
 cd generators
-
-Start the uboone container before building:
-
 ./.container.sh
+```
 
-Build the generator stack inside the container:
+Build the required stack:
 
+```
 ./build_generators.sh
+```
 
-This builds GENIE v3.6.0, GiBUU 2025, NuWro 21.09.2, nusystematics, HepMC3, and NUISANCE.
+This builds GENIE 3.6.2, GiBUU 2025, NuWro, nusystematics, HepMC3, and
+NUISANCE. Set up each new shell with:
 
-Set up the environment in each new shell:
-
-cd /path/to/generators
+```
 source setup_generators.sh
+```
 
-The setup script configures the generator paths and requests a uboone token.
+The scoped analysis workflow is:
 
-Run the analysis sample runners:
+```
+dry_run=1 analysis/bin/milestone_10k.sh
+analysis/bin/milestone_10k.sh
 
-analysis/run_all.sh
+dry_run=1 jobs_per_sample=10 events_per_job=200000 analysis/bin/submit_genie_grid_samples.sh
+jobs_per_sample=10 events_per_job=200000 analysis/bin/submit_genie_grid_samples.sh
 
-If the GENIE spline XML is missing or stale, regenerate it before running gevgen:
+run_analysis=1 produce_samples=0 analysis/bin/pipeline.sh analysis/share/config/milestone_10k.env
+```
 
-gmkspl -p 14 -t 1000180400 -e 10. \
-  -o analysis/splines/14_1000180400_CC_v3_6_2_AR23_20i_00_000.xml \
-  --tune AR23_20i_00_000 --event-generator-list CC
-
-Regenerate the XML when the probe, target, interaction list, GENIE tune/model setup, or energy coverage changes.
+GENIE grid outputs must be flattened into the manifest target paths with
+`analysis/bin/flatten_genie_grid_outputs.sh` before the common analysis pass.
+The detailed analysis instructions, including GENIE spline creation, are in
+`analysis/README`.

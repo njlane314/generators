@@ -1,4 +1,5 @@
 HepMC3
+analysis/output/
 */*/*.status
 example/run_genie_dune_fd.sh
 example/run_genie_dune_nd.sh

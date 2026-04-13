@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 # Script to simplify GENIE job submission to the grid
 
 ##### Parse any command-line options passed to this script ######
@@ -49,10 +50,10 @@ FLUX_HIST_NAME=$6
 OUTPUT_DIRECTORY=$7
 GIT_CHECKOUT=$8
 
-GRID_RESOURCES_DIR=/pnfs/uboone/persistent/users/$(whoami)/grid
+GRID_RESOURCES_DIR="${GRID_RESOURCES_DIR:-/pnfs/uboone/persistent/users/$(whoami)/grid}"
 
 # Check if the USE_PRODUCTION variable is set
-if [ ! -z ${USE_PRODUCTION+x} ]; then
+if [ -n "${USE_PRODUCTION+x}" ]; then
   echo "Production job will run as uboonepro"
   PROD_OPTION="--role=Production"
 else
@@ -63,13 +64,13 @@ fi
 #source /cvmfs/fermilab.opensciencegrid.org/products/common/etc/setups
 #setup fife_utils
 
-MY_GENIE_ARGS="$(<$ARGS_FILE)"
+MY_GENIE_ARGS="$(<"$ARGS_FILE")"
 
-jobsub_submit -G uboone --disk=60GB --expected-lifetime=8h -N $NUM_JOBS \
-  $PROD_OPTION -f $SPLINES_FILE -f $FLUX_FILE \
-  -e FLUX_HIST_NAME=${FLUX_HIST_NAME} -d OUTPUT $OUTPUT_DIRECTORY \
+jobsub_submit -G uboone --disk=60GB --expected-lifetime=8h -N "$NUM_JOBS" \
+  $PROD_OPTION -f "$SPLINES_FILE" -f "$FLUX_FILE" \
+  -e FLUX_HIST_NAME="${FLUX_HIST_NAME}" -d OUTPUT "$OUTPUT_DIRECTORY" \
   --resource-provides=usage_model=DEDICATED,OPPORTUNISTIC,OFFSITE \
   --singularity-image \
     /cvmfs/singularity.opensciencegrid.org/fermilab/fnal-wn-sl7:latest \
-  file://$GRID_RESOURCES_DIR/genie_grid.sh $STEM $(basename $SPLINES_FILE) \
-  $(basename $FLUX_FILE) ${GIT_CHECKOUT} ${MY_GENIE_ARGS}
+  "file://${GRID_RESOURCES_DIR}/genie_grid.sh" "$STEM" "$(basename "$SPLINES_FILE")" \
+  "$(basename "$FLUX_FILE")" "${GIT_CHECKOUT}" ${MY_GENIE_ARGS}

@@ -1,11 +1,11 @@
 #!/bin/bash                                                                                                                                                                                               
-# GENIE v3.6.0
+# GENIE 3.6.2
 ./build_genie.sh
 
 # GiBUU 2025
 ./build_gibuu.sh
 
-# nuwro 21.09.2 
+# NuWro
 ./build_nuwro.sh
 
 ./build_nusyst.sh
