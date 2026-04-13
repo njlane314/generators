@@ -1,5 +1,9 @@
 HepMC3
 analysis/output/
+analysis/*_cxx.d
+analysis/*_cxx.so
+analysis/*_cxx_ACLiC_dict_rdict.pcm
+input-flux.root
 */*/*.status
 example/run_genie_dune_fd.sh
 example/run_genie_dune_nd.sh
